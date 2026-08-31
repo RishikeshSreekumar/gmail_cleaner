@@ -1,0 +1,5 @@
+__pycache__/
+.venv/
+*.db
+*.egg-info/
+.gmail_cleaner/

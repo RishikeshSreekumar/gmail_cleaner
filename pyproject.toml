@@ -1,0 +1,21 @@
+[project]
+name = "gmail-cleaner"
+version = "0.1.0"
+description = "Local Gmail observability + cleanup dashboard (IMAP, metadata-only)"
+requires-python = ">=3.11"
+dependencies = [
+    "textual>=0.80",
+    "typer>=0.12",
+    "rich>=13.7",
+    "keyring>=25.0",
+]
+
+[project.scripts]
+gclean = "gmail_cleaner.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gmail_cleaner"]
