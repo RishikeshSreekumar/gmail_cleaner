@@ -22,12 +22,14 @@ from textual.widgets import (
     Button, DataTable, Footer, Input, Label, ListItem, ListView, Static,
 )
 
-from . import actions, db, stats, sync
-from .config import Config, get_password
-from .imapclient import GmailImap, ImapError
+from . import accounts as acct_mod
+from . import actions, db, providers, stats, sync
+from .accounts import Account, Store
+from .providers import MailError
 
 NAV = [
     ("dashboard", "Dashboard"),
+    ("accounts", "Accounts"),
     ("attention", "Attention"),
     ("domains", "Domains"),
     ("senders", "Senders"),
@@ -173,14 +175,16 @@ class CleanerApp(App):
         Binding("p", "rule('protect')", "Protect sender"),
         Binding("i", "rule('ignore')", "Ignore sender"),
         Binding("u", "undo", "Undo last"),
-        Binding("o", "open_gmail", "Open in Gmail"),
+        Binding("o", "open_web", "Open in webmail"),
+        Binding("A", "next_account", "Next account", show=False),
         Binding("d", "delete_rule", "Delete rule", show=False),
     ]
 
-    def __init__(self, conn, config: Config):
+    def __init__(self, store: Store, account: Account):
         super().__init__()
-        self.conn = conn
-        self.config = config
+        self.store = store
+        self.account = account
+        self.conn = db.connect(account)
         self.stack: list[Pane] = [Pane("dashboard", "Dashboard")]
         self.row_meta: list[dict] = []
         self.busy = False
@@ -214,9 +218,9 @@ class CleanerApp(App):
     def refresh_status(self, message: str = "") -> None:
         o = stats.overview(self.conn)
         last = db.get_state(self.conn, "last_sync")
-        mode = "READ-ONLY" if not self.config.actions_enabled else "actions enabled"
+        mode = "READ-ONLY" if not self.account.actions_enabled else "actions enabled"
         bits = [
-            self.config.email or "(not configured)",
+            f"{self.account.display} [{self.account.provider_info.name}]",
             f"{o['total'] or 0} indexed",
             f"{o['unread'] or 0} unread",
             stats.human_size(o["bytes"]),
@@ -240,6 +244,27 @@ class CleanerApp(App):
             self.stack.pop()
             self.render_pane()
 
+    # -- accounts -----------------------------------------------------------
+    def switch_account(self, account: Account) -> None:
+        """Point the whole dashboard at another mailbox. Nothing is shared."""
+        if account.id == self.account.id:
+            return
+        self.conn.close()
+        self.account = account
+        self.store.set_active(account)
+        self.conn = db.connect(account)
+        self.stack = [Pane("dashboard", "Dashboard")]
+        self.render_pane()
+        self.notify_status(f"switched to {account.display}")
+
+    def action_next_account(self) -> None:
+        accts = self.store.accounts
+        if len(accts) < 2:
+            self.notify_status("only one account configured - add one: mclean add")
+            return
+        ids = [a.id for a in accts]
+        self.switch_account(accts[(ids.index(self.account.id) + 1) % len(accts)])
+
     # -- navigation ---------------------------------------------------------
     @on(ListView.Selected, "#nav")
     def nav_selected(self, event: ListView.Selected) -> None:
@@ -255,7 +280,10 @@ class CleanerApp(App):
             return
         meta = self.row_meta[event.cursor_row]
         kind = self.pane.kind
-        if kind == "domains":
+        if kind == "accounts":
+            if account := meta.get("account"):
+                self.switch_account(account)
+        elif kind == "domains":
             self.push(Pane("senders", f"Domains / {meta['key']}",
                            meta["where"], meta["params"],
                            {"domain": meta["key"]}))
@@ -422,10 +450,10 @@ class CleanerApp(App):
                 (m["subject"] or "(no subject)")[:60],
                 f"{m['category']}{'/' + m['subcategory'] if m['subcategory'] else ''}",
                 stats.ago(m["received_at"]), stats.human_size(m["size"]),
-            ], {"key": m["gm_msgid"], "where": "gm_msgid = ?",
-                "params": (m["gm_msgid"],), "row": m})
+            ], {"key": m["msg_key"], "where": "msg_key = ?",
+                "params": (m["msg_key"],), "row": m})
         self._hint("Unread mail the classifier thinks matters. "
-                   "Enter: details   o open in Gmail")
+                   "Enter: details   o open in webmail")
 
     def _render_messages(self, table, pane) -> None:
         table.add_columns("", "From", "Subject", "Category", "Retention", "When", "Size")
@@ -438,10 +466,31 @@ class CleanerApp(App):
                 (m["subject"] or "(no subject)")[:58],
                 m["category"] or "", m["retention"] or "",
                 stats.ago(m["received_at"]), stats.human_size(m["size"]),
-            ], {"key": m["gm_msgid"], "where": "gm_msgid = ?",
-                "params": (m["gm_msgid"],), "row": m})
+            ], {"key": m["msg_key"], "where": "msg_key = ?",
+                "params": (m["msg_key"],), "row": m})
         self._hint(f"{len(rows)} messages   P protected  * starred  u unread   "
-                   "Enter: details   o open in Gmail")
+                   "Enter: details   o open in webmail")
+
+    def _render_accounts(self, table, pane) -> None:
+        table.add_columns("", "Account", "Provider", "Mode", "Messages", "Unread",
+                          "Size", "Last sync")
+        for a in self.store.accounts:
+            conn = self.conn if a.id == self.account.id else db.connect(a)
+            try:
+                o = stats.overview(conn)
+                last = db.get_state(conn, "last_sync")
+            finally:
+                if conn is not self.conn:
+                    conn.close()
+            self._add(table, [
+                ">" if a.id == self.account.id else " ",
+                a.display[:32], a.provider_info.name[:22],
+                "actions on" if a.actions_enabled else "read-only",
+                o["total"] or 0, o["unread"] or 0,
+                stats.human_size(o["bytes"]), stats.ago(last),
+            ], {"key": a.id, "where": "1=0", "params": (), "account": a})
+        self._hint("Enter switches account (or shift-A cycles). Each mailbox has "
+                   "its own index, rules and history. Add one: mclean add")
 
     def _render_rules(self, table, pane) -> None:
         table.add_columns("id", "Match", "Value", "Action", "Category", "Created")
@@ -475,7 +524,7 @@ class CleanerApp(App):
             f"  Date        {time.strftime('%a %d %b %Y %H:%M', time.localtime(m['received_at']))}",
             f"  Size        {stats.human_size(m['size'])}"
             f"{'   has attachment' if m['has_attachment'] else ''}",
-            f"  Gmail       {labels}", "",
+            f"  Labels      {labels}", "",
             f"  Category    {m['category']}"
             f"{'/' + m['subcategory'] if m['subcategory'] else ''}"
             f"   (confidence {m['confidence']})",
@@ -485,7 +534,7 @@ class CleanerApp(App):
             f"  Why         {m['reasons']}",
             "", f"  List-Id     {m['list_id'] or '-'}",
             f"  Unsubscribe {'available' if m['unsubscribe'] else 'no'}",
-            "", "[dim]Press o to open this thread in Gmail, escape to go back.[/dim]",
+            "", "[dim]Press o to open this message in your webmail, escape to go back.[/dim]",
         ]
         self.push(Pane("detail", "Message"))
         table = self.query_one(DataTable)
@@ -500,23 +549,23 @@ class CleanerApp(App):
         pass
 
     # -- commands -----------------------------------------------------------
-    def _client(self) -> GmailImap | None:
-        pw = get_password(self.config.email)
-        if not self.config.email or not pw:
-            self.notify_status("Not configured. Run: gclean setup")
+    def _client(self):
+        try:
+            return acct_mod.backend(self.account)
+        except MailError as e:
+            self.notify_status(str(e))
             return None
-        return GmailImap(self.config.email, pw)
 
     def action_sync(self) -> None:
         if self.busy:
             return
         self.busy = True
         self.notify_status("syncing...")
-        self._sync_worker()
+        self._sync_worker(self.account)
 
     @work(thread=True)
-    def _sync_worker(self) -> None:
-        conn = db.connect()
+    def _sync_worker(self, account: Account) -> None:
+        conn = db.connect(account)
         try:
             client = self._client()
             if client is None:
@@ -526,9 +575,9 @@ class CleanerApp(App):
                     self.call_from_thread(
                         self.notify_status, f"syncing {done}/{total}"
                     )
-                n = sync.sync(conn, client, self.config.sync_days, progress=progress)
+                n = sync.sync(conn, client, account.sync_days, progress=progress)
             self.call_from_thread(self.notify_status, f"sync done, {n} messages seen")
-        except ImapError as e:
+        except MailError as e:
             self.call_from_thread(self.notify_status, f"sync failed: {e}")
         except Exception as e:  # keep the UI alive on unexpected IMAP hiccups
             self.call_from_thread(self.notify_status, f"sync error: {e}")
@@ -546,9 +595,10 @@ class CleanerApp(App):
         meta = self.current_meta()
         if not meta or meta["where"] == "1=0":
             return
-        if not self.config.actions_enabled:
+        if not self.account.actions_enabled:
             self.notify_status(
-                "Actions are disabled. Enable with: gclean enable-actions"
+                "Actions are disabled for this account. Enable with: "
+                f"mclean enable-actions -a {self.account.id}"
             )
             return
         where, params = meta["where"], meta["params"]
@@ -571,8 +621,10 @@ class CleanerApp(App):
                 def after_label(name: str | None) -> None:
                     if name:
                         self._run_action("label", where, params, name)
-                self.push_screen(Prompt("Gmail label to apply:",
-                                        self.config.review_label), after_label)
+                question = ("Label to apply:" if self.account.provider_info.backend.supports_labels
+                            else "Folder to file these into:")
+                self.push_screen(Prompt(question, self.account.review_label),
+                                 after_label)
             else:
                 self._run_action(choice, where, params, None)
 
@@ -590,7 +642,7 @@ class CleanerApp(App):
 
     @work(thread=True)
     def _action_worker(self, action, where, params, label) -> None:
-        conn = db.connect()
+        conn = db.connect(self.account)
         try:
             client = self._client()
             if client is None:
@@ -626,7 +678,7 @@ class CleanerApp(App):
 
     @work(thread=True)
     def _undo_worker(self, batch_id: str) -> None:
-        conn = db.connect()
+        conn = db.connect(self.account)
         try:
             client = self._client()
             if client is None:
@@ -670,20 +722,21 @@ class CleanerApp(App):
         self.render_pane()
         self.notify_status("rule deleted")
 
-    def action_open_gmail(self) -> None:
+    def action_open_web(self) -> None:
         meta = self.current_meta() or self.pane.extra
         row = meta.get("row") if meta else None
         if not row:
             self.notify_status("select a message first")
             return
-        try:
-            thread_hex = format(int(row["gm_thrid"]), "x")
-        except (TypeError, ValueError):
-            self.notify_status("no thread id for this message")
+        url = providers.message_url(self.account, row)
+        if not url:
+            self.notify_status(
+                f"{self.account.provider_info.name} has no linkable web view"
+            )
             return
-        webbrowser.open(f"https://mail.google.com/mail/u/0/#all/{thread_hex}")
+        webbrowser.open(url)
         self.notify_status("opened in browser")
 
 
-def run_app(conn, config: Config) -> None:
-    CleanerApp(conn, config).run()
+def run_app(store: Store, account: Account) -> None:
+    CleanerApp(store, account).run()

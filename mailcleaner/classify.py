@@ -110,9 +110,11 @@ def classify(m: dict) -> Verdict:
     reasons: list[str] = []
     conf = 0.5
 
-    gmail_promo = any("promotion" in l for l in labels)
-    gmail_social = any("social" in l for l in labels)
-    gmail_forum = any("forum" in l for l in labels)
+    # Gmail's category labels, and the equally-named folders people keep on
+    # other servers, are a strong hint about what a message is.
+    tagged_promo = any("promotion" in l for l in labels)
+    tagged_social = any("social" in l for l in labels)
+    tagged_forum = any("forum" in l for l in labels)
     starred = bool(m.get("is_starred"))
     important = bool(m.get("is_important"))
 
@@ -151,7 +153,7 @@ def classify(m: dict) -> Verdict:
     elif dom_in(WORK_ISH_DOMAINS):
         category, sub, conf = "work", root, 0.7
         reasons.append("known work tool")
-    elif gmail_promo or PROMO_RE.search(subject):
+    elif tagged_promo or PROMO_RE.search(subject):
         category, conf = "promotion", 0.7
         reasons.append("promotional signals")
     elif has_list and NEWSLETTER_RE.search(subject):
@@ -160,9 +162,9 @@ def classify(m: dict) -> Verdict:
     elif has_list:
         category, conf = "newsletter", 0.65
         reasons.append("List-Id / List-Unsubscribe header")
-    elif gmail_social or gmail_forum:
+    elif tagged_social or tagged_forum:
         category, conf = "social", 0.6
-        reasons.append("Gmail social/forums category")
+        reasons.append("social/forums label or folder")
     elif automated:
         category, conf = "automated", 0.6
         reasons.append("automated sender address")
@@ -179,7 +181,7 @@ def classify(m: dict) -> Verdict:
     )
     if starred:
         protected = True
-        reasons.append("starred in Gmail")
+        reasons.append("starred/flagged by you")
     if category in ("newsletter", "promotion", "social") and not starred:
         protected = False
 

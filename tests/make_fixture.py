@@ -1,10 +1,20 @@
 """Generate a synthetic index so the UI can be exercised without a real mailbox."""
 
 import json
+import os
 import random
+import tempfile
 import time
 
-from gmail_cleaner import db, sync
+
+def sandbox() -> str:
+    """Point both the current and the legacy home at throwaway directories, so a
+    test run can never see - or migrate - the developer's real config."""
+    tmp = tempfile.mkdtemp()
+    os.environ["MAILCLEANER_HOME"] = os.path.join(tmp, "home")
+    os.environ["GMAIL_CLEANER_HOME"] = os.path.join(tmp, "legacy")
+    return tmp
+
 
 SENDERS = [
     ("jobs-noreply@linkedin.com", "linkedin.com", ["You have 3 new job alerts", "People you may know"]),
@@ -20,7 +30,9 @@ SENDERS = [
 ]
 
 
-def build(conn, n=900, seed=7):
+def build(conn, n=900, seed=7, folder="[Gmail]/All Mail"):
+    from mailcleaner import db, sync
+
     rnd = random.Random(seed)
     now = int(time.time())
     rules = sync.load_rules(conn)
@@ -33,7 +45,9 @@ def build(conn, n=900, seed=7):
         if rnd.random() < 0.05:
             labels.append("\\Important")
         m = {
-            "gm_msgid": str(10_000 + i), "uid": 100 + i, "gm_thrid": str(90_000 + i),
+            "msg_key": str(10_000 + i), "uid": 100 + i,
+            "thread_key": str(90_000 + i), "folder": folder,
+            "message_id": f"<{10_000 + i}@{domain}>",
             "received_at": ts, "from_name": addr.split("@")[0], "from_email": addr,
             "from_domain": domain, "to_emails": json.dumps(["me@example.com"]),
             "subject": rnd.choice(subjects), "size": rnd.randint(3_000, 4_000_000),
@@ -48,5 +62,69 @@ def build(conn, n=900, seed=7):
         rows.append(sync.enrich(m, rules))
     sync.upsert(conn, rows)
     db.set_state(conn, "last_sync", now - 600)
-    db.set_state(conn, "last_uid", 100 + n)
+    db.set_state(conn, "folders", [folder])
     return len(rows)
+
+
+class FakeBackend:
+    """Records backend calls instead of making them. Mirrors the label-shaped
+    (Gmail) contract; `moves_on_action` flips it to the folder-shaped one."""
+
+    supports_labels = True
+    moves_on_action = False
+
+    def __init__(self, moves=False):
+        self.calls = []
+        self.moves_on_action = moves
+        self.supports_labels = not moves
+        self.inbox = "INBOX"
+        self.archive_box = "Archive"
+        self.trash_box = "Trash"
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
+
+    def connect(self):
+        pass
+
+    def close(self):
+        pass
+
+    def _note(self, what, refs, extra=None):
+        self.calls.append((what, len(refs), extra))
+
+    def archive(self, refs):
+        self._note("archive", refs)
+        return self.archive_box if self.moves_on_action else "[Gmail]/All Mail"
+
+    def unarchive(self, refs):
+        self._note("unarchive", refs)
+
+    def trash(self, refs):
+        self._note("trash", refs)
+        return self.trash_box
+
+    def untrash(self, refs):
+        self._note("untrash", refs)
+
+    def mark_read(self, refs):
+        self._note("mark_read", refs)
+
+    def mark_unread(self, refs):
+        self._note("mark_unread", refs)
+
+    def star(self, refs):
+        self._note("star", refs)
+
+    def unstar(self, refs):
+        self._note("unstar", refs)
+
+    def apply_label(self, refs, name):
+        self._note("apply_label", refs, name)
+        return name if self.moves_on_action else "[Gmail]/All Mail"
+
+    def remove_label(self, refs, name):
+        self._note("remove_label", refs, name)

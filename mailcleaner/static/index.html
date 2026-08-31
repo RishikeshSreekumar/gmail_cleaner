@@ -1,7 +1,8 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gclean</title>
+<title>mclean</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='8' fill='%23924b2c'/%3E%3Cpath d='M7.5 10.25h13v8a1.25 1.25 0 0 1-1.25 1.25h-10.5A1.25 1.25 0 0 1 7.5 18.25z' fill='none' stroke='%23fff' stroke-width='1.5'/%3E%3Cpath d='M7.5 10.6 14 15.4l6.5-4.8' fill='none' stroke='%23fff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -47,10 +48,44 @@
   header { display: flex; align-items: center; gap: 20px; padding: 14px 28px;
     border-bottom: 1px solid var(--line); background: var(--panel);
     position: sticky; top: 0; z-index: 20; }
-  .brand { display: flex; align-items: baseline; gap: 10px; }
-  .brand b { font-family: var(--mono); font-size: 14px; font-weight: 500;
-    letter-spacing: -0.01em; color: var(--accent); }
-  .brand span { font-size: 13px; color: var(--dim); }
+  .brand { display: flex; align-items: center; gap: 9px; }
+  .brand .mark { display: block; border-radius: 8px; flex: none; }
+  .brand b { font-family: var(--mono); font-size: 15px; font-weight: 500;
+    letter-spacing: -0.02em; color: var(--ink); }
+
+  /* Account switcher: a menu, not a form control — it is a place you go, and
+     the last row is an action rather than a choice. */
+  .acct { position: relative; }
+  .acct-btn { display: flex; align-items: center; gap: 9px; max-width: 300px;
+    padding: 6px 10px 6px 8px; font: inherit; font-size: 13px; color: var(--ink);
+    background: none; border: 1px solid transparent; border-radius: 9px; cursor: pointer; }
+  .acct-btn:hover, .acct-btn[aria-expanded="true"] { background: var(--white);
+    border-color: var(--line); }
+  .acct-btn .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .acct-btn .caret { flex: none; color: var(--dim); }
+  .dot { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid;
+    place-items: center; font-size: 11px; font-weight: 600; color: var(--white);
+    background: var(--accent); text-transform: uppercase; font-family: var(--sans); }
+
+  .menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 50;
+    min-width: 320px; padding: 6px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 13px;
+    box-shadow: 0 12px 34px oklch(0.24 0.012 60 / 0.14); }
+  .menu .mrow { display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 9px 10px; font: inherit; text-align: left; background: none;
+    border: none; border-radius: 9px; cursor: pointer; color: var(--ink); }
+  .menu .mrow:hover { background: var(--raised); }
+  .menu .mrow .t { flex: 1; min-width: 0; }
+  .menu .mrow .n { font-size: 13.5px; font-weight: 500; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .menu .mrow .s { font-size: 11.5px; color: var(--dim); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .menu .mrow .tick { flex: none; color: var(--accent); font-size: 13px; }
+  .menu .sep { height: 1px; margin: 6px 4px; background: var(--line); }
+  .menu .mrow.add .dot { background: none; border: 1px dashed var(--line2);
+    color: var(--dim); font-size: 14px; font-weight: 400; }
+  .menu .eyebrow { padding: 8px 10px 6px; font-size: 10.5px; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--dim); }
   .seg { display: flex; gap: 2px; padding: 2px; background: oklch(0.94 0.012 82);
     border-radius: 8px; margin-left: 8px; }
   .seg button { padding: 5px 11px; border: none; border-radius: 6px;
@@ -249,10 +284,51 @@
     box-shadow: 0 8px 28px oklch(0.24 0.012 60 / 0.28); display: none; max-width: 420px; }
   #toast.bad { background: oklch(0.42 0.14 30); }
   .err { color: oklch(0.48 0.15 30); }
+
+  /* Add-mailbox form. */
+  .plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .plist button { text-align: left; padding: 12px 14px; border: 1px solid var(--line2);
+    background: var(--white); border-radius: 10px; cursor: pointer; font: inherit; color: var(--ink); }
+  .plist button:hover { border-color: var(--accent); }
+  .plist .pn { font-weight: 600; font-size: 14px; }
+  .plist .pd { font-size: 12px; color: var(--dim); margin-top: 3px; line-height: 1.4; }
+  .form { display: grid; gap: 15px; }
+  .form .fl { display: block; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--dim); margin-bottom: 6px; }
+  .form input, .form select { width: 100%; padding: 9px 12px; font: inherit; font-size: 14px;
+    border: 1px solid var(--line2); border-radius: 8px; background: var(--white); color: var(--ink); }
+  .form input:focus, .form select:focus { outline: none; border-color: var(--accent); }
+  .form .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .steps { white-space: pre-wrap; font-size: 13px; line-height: 1.6; color: var(--ink2);
+    background: var(--raised); border: 1px solid var(--hair); border-radius: 10px; padding: 14px 16px; }
+  .steps a { color: var(--accent); }
+  .devcode { font-family: var(--mono); font-size: 30px; font-weight: 500; letter-spacing: 0.14em;
+    padding: 16px 0; text-align: center; }
+  .empty { max-width: 560px; margin: 60px auto; text-align: center; }
 </style>
 
 <header>
-  <div class="brand"><b>gclean</b><span id="account">—</span></div>
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 28 28" width="26" height="26" aria-hidden="true">
+      <rect width="28" height="28" rx="8" fill="var(--accent)"/>
+      <path d="M7.5 10.25h13v8a1.25 1.25 0 0 1-1.25 1.25h-10.5A1.25 1.25 0 0 1 7.5 18.25z"
+            fill="none" stroke="#fff" stroke-width="1.5"/>
+      <path d="M7.5 10.6 14 15.4l6.5-4.8" fill="none" stroke="#fff" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <b>mclean</b>
+  </div>
+  <div class="acct">
+    <button id="acct-btn" class="acct-btn" aria-haspopup="menu" aria-expanded="false">
+      <span class="dot"></span>
+      <span class="who">—</span>
+      <svg class="caret" viewBox="0 0 10 6" width="10" height="6" aria-hidden="true">
+        <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.4"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <div id="acct-menu" class="menu" role="menu" hidden></div>
+  </div>
   <div class="seg">
     <button id="seg-ro">Read-only</button>
     <button id="seg-on">Actions on</button>
@@ -341,6 +417,9 @@ const S = {
   filter: 'All',
   senders: [],
   overview: null,
+  activeAccount: '',
+  accounts: [],
+  needsSetup: false,
 };
 
 const DOMAIN_COLORS = [
@@ -358,12 +437,13 @@ const TREND = {
 };
 
 /* Actions the server will actually accept. There is no unsubscribe and no
-   permanent delete anywhere in this tool; trash is Gmail's, and reversible. */
+   permanent delete anywhere in this tool; trash is the provider's own, and
+   reversible. */
 const ACTIONS = [
   { id: 'mark_read', label: 'Mark read' },
   { id: 'archive',   label: 'Archive' },
   { id: 'trash',     label: 'Trash', danger: true,
-    title: 'Moves to Gmail Trash — recoverable for 30 days, and undoable from History' },
+    title: 'Moves to your provider\'s Trash — recoverable there, and undoable from History' },
 ];
 
 /* ---------- sender table ---------- */
@@ -437,7 +517,7 @@ function toggle(key) {
 }
 
 function needActions() {
-  toast('Read-only. Run `gclean enable-actions` in the terminal to allow changes.');
+  toast('Read-only. Run `mclean enable-actions` in the terminal to allow changes.');
 }
 
 /* ---------- selection bar ---------- */
@@ -583,7 +663,7 @@ async function openSender(email) {
       onclick: () => openPreview(target, 'archive') }));
     acts.append(el('button', { className: 'btn primary',
       textContent: `Trash ${num(eligible)}`,
-      title: 'Moves to Gmail Trash — recoverable, and undoable from History',
+      title: 'Moves to your provider\'s Trash — recoverable, and undoable from History',
       onclick: () => openPreview(target, 'trash') }));
     foot.append(acts);
   }
@@ -667,7 +747,7 @@ async function openPreview(target, preferred) {
   if (!S.actions) {
     const msg = el('span', { className: 'msg' });
     msg.append('Read-only. Run ');
-    msg.append(el('code', { textContent: 'gclean enable-actions' }));
+    msg.append(el('code', { textContent: 'mclean enable-actions' }));
     msg.append(' in the terminal to allow changes.');
     foot.append(msg);
   } else if (!info.eligible) {
@@ -1011,6 +1091,7 @@ const NAV = [
 function drawNav() {
   const nav = $('#nav');
   nav.textContent = '';
+  if (S.needsSetup) return;
   for (const item of NAV) {
     if (!item) { nav.append(el('div', { className: 'rule' })); continue; }
     const [k, label] = item;
@@ -1035,6 +1116,18 @@ async function go(tab, opts = {}) {
   drawNav();
   const main = $('#main');
   main.textContent = '';
+  if (S.needsSetup) {
+    main.append(el('div', { className: 'empty' }, [
+      el('h2', { textContent: 'Connect a mailbox' }),
+      el('p', { className: 'lede', textContent:
+        'Nothing is indexed yet. Add Gmail, Outlook, Proton, Fastmail, iCloud, ' +
+        'Yahoo, Zoho or any IMAP server — you can add as many as you like, and ' +
+        'each is kept separate.' }),
+      el('button', { className: 'btn primary big', textContent: 'Add a mailbox',
+        onclick: () => openAddAccount() }),
+    ]));
+    return;
+  }
   main.append(el('p', { className: 'lede', textContent: 'Loading…' }));
   const fresh = el('main', { id: 'main' });
   try {
@@ -1058,7 +1151,7 @@ function drawMode() {
 
 $('#seg-ro').onclick = () => {
   if (!S.actions) return;
-  toast('Actions stay on until you run `gclean disable-actions` in the terminal.');
+  toast('Actions stay on until you run `mclean disable-actions` in the terminal.');
 };
 $('#seg-on').onclick = () => { if (!S.actions) needActions(); };
 
@@ -1066,14 +1159,288 @@ async function refreshHeader() {
   try {
     const d = await api('overview');
     S.overview = d;
+    S.needsSetup = !!d.needs_setup;
     S.actions = !!d.actions_enabled;
     if (!S.actions) S.selected.clear();
-    $('#account').textContent = d.account || '(not configured)';
-    $('#headstat').textContent =
+    drawAccounts(d.accounts || [], d.account_id);
+    $('#btn-sync').disabled = S.needsSetup;
+    $('#headstat').textContent = S.needsSetup ? 'no mailbox connected' :
       `${num(d.stats.total)} messages · synced ${ago(d.last_sync)} · ` +
       `${d.sync_days}d window`;
     drawMode();
   } catch (e) { toast(e.message, true); }
+}
+
+/* The switcher. Each mailbox gets a colour derived from its id so two accounts
+   never look alike at a glance; switching is a server-side change of the active
+   account, so every subsequent request reads that account's index. */
+function hueFor(id) {
+  let h = 0;
+  for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return h;
+}
+function badge(a) {
+  return el('span', { className: 'dot',
+    style: `background: oklch(0.55 0.12 ${hueFor(a.id)})`,
+    textContent: (a.label || a.email || '?').trim()[0] || '?' });
+}
+
+function drawAccounts(rows, activeId) {
+  S.accounts = rows;
+  S.activeAccount = activeId || '';
+  const active = rows.find((a) => a.id === activeId);
+  const btn = $('#acct-btn');
+  btn.textContent = '';
+  btn.append(
+    active ? badge(active) : el('span', { className: 'dot', textContent: '+' }),
+    el('span', { className: 'who',
+      textContent: active ? active.label : 'No mailbox yet' }),
+    caret(),
+  );
+
+  const menu = $('#acct-menu');
+  menu.textContent = '';
+  if (rows.length) menu.append(el('div', { className: 'eyebrow', textContent: 'Mailboxes' }));
+  for (const a of rows) {
+    menu.append(el('button', { className: 'mrow', role: 'menuitem',
+      onclick: () => pickAccount(a) }, [
+      badge(a),
+      el('div', { className: 't' }, [
+        el('div', { className: 'n', textContent: a.label }),
+        el('div', { className: 's', textContent:
+          a.label === a.email ? a.provider : `${a.provider} · ${a.email}` }),
+      ]),
+      el('span', { className: 'tick', textContent: a.id === activeId ? '✓' : '' }),
+    ]));
+  }
+  if (rows.length) menu.append(el('div', { className: 'sep' }));
+  menu.append(el('button', { className: 'mrow add', role: 'menuitem',
+    onclick: () => { closeMenu(); openAddAccount(); } }, [
+    el('span', { className: 'dot', textContent: '+' }),
+    el('div', { className: 't' }, [
+      el('div', { className: 'n', textContent: 'Add mailbox' }),
+      el('div', { className: 's', textContent: 'Gmail, Outlook, Proton, IMAP…' }),
+    ]),
+  ]));
+}
+
+function caret() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'caret');
+  svg.setAttribute('viewBox', '0 0 10 6');
+  svg.setAttribute('width', '10');
+  svg.setAttribute('height', '6');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M1 1l4 4 4-4');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', 'currentColor');
+  path.setAttribute('stroke-width', '1.4');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-linejoin', 'round');
+  svg.append(path);
+  return svg;
+}
+
+function openMenu() {
+  $('#acct-menu').hidden = false;
+  $('#acct-btn').setAttribute('aria-expanded', 'true');
+  setTimeout(() => document.addEventListener('click', outsideMenu), 0);
+  document.addEventListener('keydown', escMenu);
+}
+function closeMenu() {
+  $('#acct-menu').hidden = true;
+  $('#acct-btn').setAttribute('aria-expanded', 'false');
+  document.removeEventListener('click', outsideMenu);
+  document.removeEventListener('keydown', escMenu);
+}
+function outsideMenu(e) { if (!e.target.closest('.acct')) closeMenu(); }
+function escMenu(e) { if (e.key === 'Escape') closeMenu(); }
+
+$('#acct-btn').onclick = () => ($('#acct-menu').hidden ? openMenu() : closeMenu());
+
+async function pickAccount(a) {
+  closeMenu();
+  if (a.id === S.activeAccount) return;
+  try {
+    await api('account/use', { id: a.id });
+    await reloadAll();
+  } catch (err) { toast(err.message, true); }
+}
+
+async function reloadAll() {
+  S.overview = null;
+  S.selected.clear();
+  await refreshHeader();
+  await go(S.tab);
+}
+
+/* ---------- connecting a mailbox ----------
+   Two shapes: providers with an app password take one, and providers without
+   one (Outlook) hand the browser a device code to enter on their own site. */
+async function openAddAccount(preselect) {
+  let providers = [];
+  const sheet = openSheet((x) => x.append(el('div', { className: 'body' },
+    el('p', { className: 'lede', textContent: 'Loading providers…' }))));
+  try {
+    providers = (await api('providers')).rows;
+  } catch (e) {
+    sheet.textContent = '';
+    sheet.append(el('div', { className: 'body' },
+      el('p', { className: 'err', textContent: e.message })));
+    return;
+  }
+
+  const head = (title, sub) => el('div', { className: 'top' }, [
+    el('div', { className: 'toprow' }, [
+      el('div', { style: 'flex:1; min-width:0' }, [
+        el('div', { className: 'who', textContent: title }),
+        el('div', { className: 'pd', style: 'margin-top:6px', textContent: sub }),
+      ]),
+      el('button', { className: 'x', textContent: '✕', onclick: closeSheet }),
+    ]),
+  ]);
+
+  function chooser() {
+    sheet.textContent = '';
+    sheet.append(head('Add a mailbox',
+      'Each mailbox is indexed separately — its own rules, history and settings.'));
+    const list = el('div', { className: 'plist' });
+    for (const p of providers) {
+      list.append(el('button', { onclick: () => form(p) }, [
+        el('div', { className: 'pn', textContent: p.name }),
+        el('div', { className: 'pd', textContent: p.uses_oauth
+          ? 'Signs in through your browser' : 'Uses an app password' }),
+      ]));
+    }
+    sheet.append(el('div', { className: 'body' }, [
+      el('h3', { textContent: 'Provider' }), list,
+    ]));
+  }
+
+  function form(p) {
+    sheet.textContent = '';
+    sheet.append(head(p.name, p.uses_oauth
+      ? 'You will finish signing in on the provider’s own site.'
+      : 'The password goes straight to your system keychain.'));
+
+    const email = el('input', { type: 'email', placeholder: 'you@example.com',
+      autocomplete: 'username' });
+    const label = el('input', { type: 'text', placeholder: 'optional, e.g. work' });
+    const pass = el('input', { type: 'password', autocomplete: 'off',
+      placeholder: 'app password' });
+    const host = el('input', { type: 'text', value: p.host || '' });
+    const port = el('input', { type: 'number', value: String(p.port) });
+    const sec = el('select', {}, ['ssl', 'starttls', 'none'].map((v) =>
+      el('option', { value: v, selected: v === p.security, textContent: v })));
+
+    const fields = el('div', { className: 'form' }, [
+      el('div', {}, [el('span', { className: 'fl', textContent: 'Email address' }), email]),
+      el('div', {}, [el('span', { className: 'fl', textContent: 'Name for this mailbox' }), label]),
+    ]);
+    if (p.ask_host) {
+      fields.append(el('div', { className: 'row2' }, [
+        el('div', {}, [el('span', { className: 'fl', textContent: 'IMAP host' }), host]),
+        el('div', {}, [el('span', { className: 'fl', textContent: 'Port' }), port]),
+      ]));
+      fields.append(el('div', {}, [
+        el('span', { className: 'fl', textContent: 'Connection security' }), sec]));
+    }
+    if (!p.uses_oauth) {
+      fields.append(el('div', {}, [
+        el('span', { className: 'fl', textContent: 'App password' }), pass]));
+    }
+
+    sheet.append(el('div', { className: 'body' }, [
+      el('h3', { textContent: 'Before you start' }),
+      linkify(p.help),
+      el('h3', { textContent: 'Mailbox' }),
+      fields,
+    ]));
+
+    const msg = el('div', { className: 'msg' });
+    const go = el('button', { className: 'btn primary',
+      textContent: p.uses_oauth ? 'Start sign-in' : 'Connect' });
+    go.onclick = async () => {
+      const body = {
+        provider: p.key, email: email.value.trim(), label: label.value.trim(),
+        host: host.value.trim(), port: port.value, security: sec.value,
+      };
+      go.disabled = true;
+      msg.textContent = p.uses_oauth ? 'Asking for a code…' : 'Connecting…';
+      msg.className = 'msg';
+      try {
+        if (p.uses_oauth) {
+          const st = await api('account/oauth/start', body);
+          device(p, st);
+        } else {
+          const r = await api('account/add', { ...body, password: pass.value });
+          await connected(r);
+        }
+      } catch (e) {
+        msg.textContent = e.message;
+        msg.className = 'msg err';
+        go.disabled = false;
+      }
+    };
+    sheet.append(el('div', { className: 'foot' }, [
+      msg,
+      el('button', { className: 'btn quiet', textContent: 'Back', onclick: chooser }),
+      go,
+    ]));
+    email.focus();
+  }
+
+  /* Device-code sign-in: show the code, then poll until the provider says the
+     user finished (or gave up). */
+  function device(p, state) {
+    sheet.textContent = '';
+    sheet.append(head(p.name, 'Finish signing in, then come back to this tab.'));
+    const msg = el('div', { className: 'msg', textContent: state.message || '' });
+    sheet.append(el('div', { className: 'body' }, [
+      el('h3', { textContent: 'Step 1 — open the sign-in page' }),
+      el('p', {}, el('a', { href: state.url, target: '_blank', rel: 'noreferrer',
+        textContent: state.url })),
+      el('h3', { textContent: 'Step 2 — enter this code' }),
+      el('div', { className: 'devcode', textContent: state.code }),
+      el('p', { className: 'pd', textContent:
+        `Sign in as ${state.email}. This page will notice when you are done.` }),
+    ]));
+    sheet.append(el('div', { className: 'foot' }, [
+      msg, el('button', { className: 'btn quiet', textContent: 'Close', onclick: closeSheet }),
+    ]));
+
+    const tick = async () => {
+      if (!$('#scrim')) return;               // the user closed the sheet
+      let st;
+      try { st = await api('account/oauth/status', {}); }
+      catch (e) { msg.textContent = e.message; msg.className = 'msg err'; return; }
+      if (st.running) { msg.textContent = st.message || 'Waiting…'; return setTimeout(tick, 2000); }
+      if (st.error) { msg.textContent = st.error; msg.className = 'msg err'; return; }
+      if (st.account) await connected(st.account);
+    };
+    setTimeout(tick, 2000);
+  }
+
+  async function connected(r) {
+    closeSheet();
+    toast(`Connected ${r.label}. Sync it to build the index.`);
+    await reloadAll();
+  }
+
+  const chosen = preselect && providers.find((p) => p.key === preselect);
+  if (chosen) form(chosen); else chooser();
+}
+
+/* The setup steps arrive as plain text with bare URLs in them. */
+function linkify(text) {
+  const out = el('div', { className: 'steps' });
+  for (const part of String(text || '').split(/(https?:\/\/\S+)/g)) {
+    if (/^https?:\/\//.test(part)) {
+      out.append(el('a', { href: part, target: '_blank', rel: 'noreferrer',
+        textContent: part }));
+    } else if (part) out.append(document.createTextNode(part));
+  }
+  return out;
 }
 
 async function pollSync() {

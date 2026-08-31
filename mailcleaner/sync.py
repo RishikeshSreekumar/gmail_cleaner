@@ -1,4 +1,10 @@
-"""Fetch Gmail metadata into the local index."""
+"""Fetch message metadata from a mailbox into that account's local index.
+
+Gmail hands us one virtual folder (All Mail) and labels; every other provider
+hands us a set of real folders. Both are handled the same way here: ask the
+backend which folders to walk, then track UIDVALIDITY and the highest seen UID
+per folder so re-syncs stay incremental.
+"""
 
 from __future__ import annotations
 
@@ -9,9 +15,11 @@ from email.utils import getaddresses, parsedate_to_datetime
 
 from . import db
 from .classify import apply_rules, classify
-from .imapclient import GmailImap, RawMessage
+from .providers import RawMessage
 
 BATCH = 200
+#: How many already-indexed messages per folder to re-check for flag/label edits.
+RECHECK = 500
 
 
 def _addr_parts(header: str) -> tuple[str, str, str]:
@@ -22,7 +30,7 @@ def _addr_parts(header: str) -> tuple[str, str, str]:
     return name.strip(), addr, domain
 
 
-def normalize(raw: RawMessage) -> dict:
+def normalize(raw: RawMessage, backend=None) -> dict:
     h = raw.headers
     name, addr, domain = _addr_parts(h.get("from", ""))
     ts = None
@@ -41,9 +49,11 @@ def normalize(raw: RawMessage) -> dict:
     to_all = [a for _, a in getaddresses([h.get("to", ""), h.get("cc", "")]) if a]
 
     return {
-        "gm_msgid": raw.gm_msgid,
+        "msg_key": raw.msg_key,
         "uid": raw.uid,
-        "gm_thrid": raw.gm_thrid,
+        "folder": raw.folder,
+        "message_id": raw.message_id,
+        "thread_key": raw.thread_key,
         "received_at": ts,
         "from_name": name,
         "from_email": addr,
@@ -53,7 +63,7 @@ def normalize(raw: RawMessage) -> dict:
         "size": raw.size,
         "labels": labels,
         "is_unread": int("\\Seen" not in raw.flags),
-        "is_inbox": int(any(l == "\\inbox" for l in lower)),
+        "is_inbox": int(backend.is_inbox(raw)) if backend else int("\\inbox" in lower),
         "is_starred": int("\\Flagged" in raw.flags or "\\starred" in lower),
         "is_important": int("\\important" in lower),
         "list_id": h.get("list-id", ""),
@@ -64,10 +74,10 @@ def normalize(raw: RawMessage) -> dict:
 
 
 COLUMNS = (
-    "gm_msgid uid gm_thrid received_at from_name from_email from_domain to_emails "
-    "subject size labels is_unread is_inbox is_starred is_important list_id "
-    "unsubscribe has_attachment category subcategory attention retention protected "
-    "confidence reasons synced_at"
+    "msg_key uid folder message_id thread_key received_at from_name from_email "
+    "from_domain to_emails subject size labels is_unread is_inbox is_starred "
+    "is_important list_id unsubscribe has_attachment category subcategory "
+    "attention retention protected confidence reasons synced_at"
 ).split()
 
 
@@ -80,10 +90,10 @@ def _row_tuple(m: dict) -> tuple:
 
 def upsert(conn: sqlite3.Connection, rows: list[dict]) -> None:
     placeholders = ",".join("?" * len(COLUMNS))
-    updates = ",".join(f"{c}=excluded.{c}" for c in COLUMNS if c != "gm_msgid")
+    updates = ",".join(f"{c}=excluded.{c}" for c in COLUMNS if c != "msg_key")
     conn.executemany(
         f"INSERT INTO emails ({','.join(COLUMNS)}) VALUES ({placeholders}) "
-        f"ON CONFLICT(gm_msgid) DO UPDATE SET {updates}",
+        f"ON CONFLICT(msg_key) DO UPDATE SET {updates}",
         [_row_tuple(r) for r in rows],
     )
     conn.commit()
@@ -108,47 +118,55 @@ def enrich(m: dict, rules: list[dict]) -> dict:
     return m
 
 
-def sync(
-    conn: sqlite3.Connection,
-    client: GmailImap,
-    days: int,
-    full: bool = False,
-    progress=None,
-) -> int:
-    """Pull metadata for the last `days` days. Incremental unless `full`."""
-    uidvalidity = client.uidvalidity()
-    stored_validity = db.get_state(conn, "uidvalidity")
-    last_uid = db.get_state(conn, "last_uid", 0)
-    if full or stored_validity != uidvalidity:
-        last_uid = 0
-    db.set_state(conn, "uidvalidity", uidvalidity)
+def _plan(conn, client, folder: str, days: int, full: bool) -> tuple[list[int], int]:
+    """Which UIDs to fetch from one folder, and the high-water mark to build on.
 
-    uids = client.search_since(days, min_uid=max(1, last_uid))
-    # Re-check the newest 500 known messages so flag/label changes land too.
+    Returns `(uids, base_uid)`. `base_uid` is 0 whenever the server renumbered
+    the mailbox, so a stale high-water mark can never survive a UIDVALIDITY
+    change and hide messages from the next sync.
+    """
+    validity = client.uidvalidity(folder)
+    stored = db.get_state(conn, f"uidvalidity:{folder}")
+    last_uid = db.get_state(conn, f"last_uid:{folder}", 0)
+    if full or stored != validity:
+        # The server renumbered the mailbox: every stored UID is meaningless.
+        last_uid = 0
+    db.set_state(conn, f"uidvalidity:{folder}", validity)
+
+    uids = client.search_since(folder, days, min_uid=max(1, last_uid))
     if last_uid and not full:
         known = [
-            r["uid"]
-            for r in conn.execute(
-                "SELECT uid FROM emails ORDER BY uid DESC LIMIT 500"
+            r["uid"] for r in conn.execute(
+                "SELECT uid FROM emails WHERE folder=? ORDER BY uid DESC LIMIT ?",
+                (folder, RECHECK),
             )
         ]
         uids = sorted(set(uids) | set(known))
+    return uids, last_uid
 
+
+def sync(conn, client, days: int, full: bool = False, progress=None) -> int:
+    """Pull metadata for the last `days` days across every folder worth indexing."""
+    folders = client.sync_folders()
+    plan = {folder: _plan(conn, client, folder, days, full) for folder in folders}
+    total = sum(len(uids) for uids, _ in plan.values())
     rules = load_rules(conn)
-    total = len(uids)
     done = 0
-    highest = last_uid
-    for i in range(0, total, BATCH):
-        chunk = uids[i : i + BATCH]
-        raws = client.fetch_metadata(chunk)
-        rows = [enrich(normalize(r), rules) for r in raws]
-        if rows:
-            upsert(conn, rows)
-            highest = max(highest, max(r["uid"] for r in rows))
-        done += len(chunk)
-        if progress:
-            progress(done, total)
-    db.set_state(conn, "last_uid", highest)
+
+    for folder, (uids, highest) in plan.items():
+        for i in range(0, len(uids), BATCH):
+            chunk = uids[i : i + BATCH]
+            raws = client.fetch_metadata(folder, chunk)
+            rows = [enrich(normalize(r, client), rules) for r in raws]
+            if rows:
+                upsert(conn, rows)
+                highest = max(highest, max(r["uid"] for r in rows))
+            done += len(chunk)
+            if progress:
+                progress(done, total)
+        db.set_state(conn, f"last_uid:{folder}", highest)
+
+    db.set_state(conn, "folders", folders)
     db.set_state(conn, "last_sync", int(time.time()))
     db.set_state(conn, "sync_days", days)
     return total
@@ -167,11 +185,11 @@ def reclassify_all(conn: sqlite3.Connection, progress=None) -> int:
         e = enrich(m, rules)
         updates.append(
             (e["category"], e["subcategory"], e["attention"], e["retention"],
-             e["protected"], e["confidence"], e["reasons"], e["gm_msgid"])
+             e["protected"], e["confidence"], e["reasons"], e["msg_key"])
         )
     conn.executemany(
         "UPDATE emails SET category=?,subcategory=?,attention=?,retention=?,"
-        "protected=?,confidence=?,reasons=? WHERE gm_msgid=?",
+        "protected=?,confidence=?,reasons=? WHERE msg_key=?",
         updates,
     )
     conn.commit()

@@ -1,6 +1,14 @@
 """Mutating operations. Every one is reversible and every one is logged.
 
-There is deliberately no permanent-delete operation anywhere in this file.
+There is deliberately no permanent-delete operation anywhere in this file, for
+any provider. "Trash" means the provider's own Trash folder or label, which the
+user can empty themselves whenever they choose.
+
+The provider-specific mechanics live in `providers/`: on Gmail these are label
+edits and a message never moves, while on folder-shaped servers archive, trash
+and label are IMAP MOVEs that change the message's UID. This module papers over
+that difference by recording, for every affected message, where it was and how
+to find it again (its Message-ID), so undo works either way.
 """
 
 from __future__ import annotations
@@ -10,7 +18,7 @@ import sqlite3
 import time
 import uuid
 
-from .imapclient import GmailImap
+from .providers import MsgRef
 
 ARCHIVE = "archive"
 TRASH = "trash"
@@ -18,8 +26,7 @@ MARK_READ = "mark_read"
 STAR = "star"
 LABEL = "label"
 
-INBOX_LABEL = "\\Inbox"
-TRASH_LABEL = "\\Trash"
+ALL_ACTIONS = (ARCHIVE, TRASH, MARK_READ, STAR, LABEL)
 
 
 class ProtectedMessages(Exception):
@@ -31,7 +38,7 @@ class ProtectedMessages(Exception):
 
 
 def preview(conn: sqlite3.Connection, where: str, params: tuple = ()) -> dict:
-    """What a bulk action would actually do — shown before every confirmation."""
+    """What a bulk action would actually do - shown before every confirmation."""
     from . import stats
 
     total = stats.count(conn, where, params)
@@ -57,10 +64,15 @@ def preview(conn: sqlite3.Connection, where: str, params: tuple = ()) -> dict:
 def _select(conn, where, params, include_protected: bool):
     clause = where if include_protected else f"({where}) AND protected=0"
     rows = conn.execute(
-        f"SELECT gm_msgid, uid, labels, is_unread, is_inbox, is_starred, protected "
-        f"FROM emails WHERE {clause}", params
+        f"SELECT msg_key, uid, folder, message_id, labels, is_unread, is_inbox, "
+        f"is_starred, protected FROM emails WHERE {clause}", params
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def _refs(rows: list[dict]) -> list[MsgRef]:
+    return [MsgRef(r["msg_key"], r["uid"] or 0, r.get("folder") or "",
+                   r.get("message_id") or "") for r in rows]
 
 
 def _prev_state(r: dict) -> str:
@@ -76,17 +88,26 @@ def _prev_state(r: dict) -> str:
 def _log(conn, batch_id, rows, action, detail):
     now = int(time.time())
     conn.executemany(
-        "INSERT INTO action_log(batch_id,gm_msgid,uid,action,prev_labels,detail,ts) "
-        "VALUES(?,?,?,?,?,?,?)",
-        [(batch_id, r["gm_msgid"], r["uid"], action, _prev_state(r), detail, now)
+        "INSERT INTO action_log(batch_id,msg_key,uid,folder,message_id,action,"
+        "prev_labels,detail,ts) VALUES(?,?,?,?,?,?,?,?,?)",
+        [(batch_id, r["msg_key"], r["uid"], r.get("folder") or "",
+          r.get("message_id") or "", action, _prev_state(r), detail, now)
          for r in rows],
     )
     conn.commit()
 
 
+def _mark_moved(conn, rows, dest: str) -> None:
+    """The message is in a new mailbox and its old UID is void until next sync."""
+    conn.executemany(
+        "UPDATE emails SET folder=?, uid=0 WHERE msg_key=?",
+        [(dest, r["msg_key"]) for r in rows],
+    )
+
+
 def run(
     conn: sqlite3.Connection,
-    client: GmailImap,
+    client,
     action: str,
     where: str,
     params: tuple = (),
@@ -96,6 +117,11 @@ def run(
 ) -> dict:
     """Apply `action` to every message matching `where`. Returns a batch summary."""
     rows = _select(conn, where, params, include_protected)
+    if action == ARCHIVE and getattr(client, "moves_on_action", False):
+        # On folder-shaped servers archiving is an IMAP MOVE, so only inbox mail
+        # is eligible: moving anything else would drag it out of the folder the
+        # user deliberately filed it in. On Gmail this is a no-op either way.
+        rows = [r for r in rows if r["is_inbox"]]
     if not include_protected:
         blocked = conn.execute(
             f"SELECT COUNT(*) c FROM emails WHERE ({where}) AND protected=1", params
@@ -105,45 +131,43 @@ def run(
     if not rows:
         return {"batch_id": None, "count": 0, "skipped": blocked}
 
-    uids = [r["uid"] for r in rows]
+    refs = _refs(rows)
+    keys = [(r["msg_key"],) for r in rows]
     batch_id = uuid.uuid4().hex[:12]
+    moves = getattr(client, "moves_on_action", False)
 
     if action == ARCHIVE:
-        client.remove_labels(uids, [INBOX_LABEL])
-        conn.executemany(
-            "UPDATE emails SET is_inbox=0 WHERE gm_msgid=?",
-            [(r["gm_msgid"],) for r in rows],
-        )
+        dest = client.archive(refs)
+        conn.executemany("UPDATE emails SET is_inbox=0 WHERE msg_key=?", keys)
+        if moves:
+            _mark_moved(conn, rows, dest)
     elif action == TRASH:
-        client.add_labels(uids, [TRASH_LABEL])
-        conn.executemany(
-            "DELETE FROM emails WHERE gm_msgid=?", [(r["gm_msgid"],) for r in rows]
-        )
+        client.trash(refs)
+        # Trashed mail leaves the indexed set entirely; the log still holds
+        # everything undo needs to fetch it back.
+        conn.executemany("DELETE FROM emails WHERE msg_key=?", keys)
     elif action == MARK_READ:
-        client.add_flags(uids, ["\\Seen"])
-        conn.executemany(
-            "UPDATE emails SET is_unread=0 WHERE gm_msgid=?",
-            [(r["gm_msgid"],) for r in rows],
-        )
+        client.mark_read(refs)
+        conn.executemany("UPDATE emails SET is_unread=0 WHERE msg_key=?", keys)
     elif action == STAR:
-        client.add_flags(uids, ["\\Flagged"])
+        client.star(refs)
         conn.executemany(
-            "UPDATE emails SET is_starred=1, protected=1 WHERE gm_msgid=?",
-            [(r["gm_msgid"],) for r in rows],
+            "UPDATE emails SET is_starred=1, protected=1 WHERE msg_key=?", keys
         )
     elif action == LABEL:
         if not label:
             raise ValueError("label action needs a label name")
-        client.create_label(label)
-        client.add_labels(uids, [label])
+        dest = client.apply_label(refs, label)
         for r in rows:
             labels = json.loads(r["labels"] or "[]")
             if label not in labels:
                 labels.append(label)
             conn.execute(
-                "UPDATE emails SET labels=? WHERE gm_msgid=?",
-                (json.dumps(labels), r["gm_msgid"]),
+                "UPDATE emails SET labels=? WHERE msg_key=?",
+                (json.dumps(labels), r["msg_key"]),
             )
+        if moves:
+            _mark_moved(conn, rows, dest)
     else:
         raise ValueError(f"unknown action {action}")
 
@@ -152,10 +176,10 @@ def run(
     if progress:
         progress(len(rows), len(rows))
     return {"batch_id": batch_id, "count": len(rows), "skipped": blocked,
-            "action": action, "label": label}
+            "action": action, "label": label, "moved": bool(moves)}
 
 
-def undo(conn: sqlite3.Connection, client: GmailImap, batch_id: str) -> int:
+def undo(conn: sqlite3.Connection, client, batch_id: str) -> int:
     """Reverse a logged batch."""
     rows = [dict(r) for r in conn.execute(
         "SELECT * FROM action_log WHERE batch_id=? AND undone=0", (batch_id,)
@@ -163,7 +187,6 @@ def undo(conn: sqlite3.Connection, client: GmailImap, batch_id: str) -> int:
     if not rows:
         return 0
     action = rows[0]["action"]
-    uids = [r["uid"] for r in rows]
     for r in rows:
         try:
             r["prev"] = json.loads(r["prev_labels"] or "{}")
@@ -174,32 +197,28 @@ def undo(conn: sqlite3.Connection, client: GmailImap, batch_id: str) -> int:
         """Only the messages the action actually changed."""
         return [r for r in rows if r["prev"].get(field)]
 
+    def restore_index(subset, sql):
+        conn.executemany(sql, [(r["msg_key"],) for r in subset])
+
     if action == ARCHIVE:
-        restore = was("inbox")
-        if restore:
-            client.add_labels([r["uid"] for r in restore], [INBOX_LABEL])
-            conn.executemany("UPDATE emails SET is_inbox=1 WHERE gm_msgid=?",
-                             [(r["gm_msgid"],) for r in restore])
+        subset = was("inbox")
+        if subset:
+            client.unarchive(_refs(subset))
+            restore_index(subset, "UPDATE emails SET is_inbox=1 WHERE msg_key=?")
     elif action == TRASH:
-        # Trashed mail leaves All Mail, so find it again by permanent Gmail id.
-        found = client.uids_for_msgids([r["gm_msgid"] for r in rows], client.trash)
-        if found:
-            client._select(client.trash, readonly=False)
-            client._store(list(found.values()), "-X-GM-LABELS", f'("{TRASH_LABEL}")')
+        client.untrash(_refs(rows))
     elif action == MARK_READ:
-        restore = was("unread")
-        if restore:
-            client.remove_flags([r["uid"] for r in restore], ["\\Seen"])
-            conn.executemany("UPDATE emails SET is_unread=1 WHERE gm_msgid=?",
-                             [(r["gm_msgid"],) for r in restore])
+        subset = was("unread")
+        if subset:
+            client.mark_unread(_refs(subset))
+            restore_index(subset, "UPDATE emails SET is_unread=1 WHERE msg_key=?")
     elif action == STAR:
-        restore = [r for r in rows if not r["prev"].get("starred")]
-        if restore:
-            client.remove_flags([r["uid"] for r in restore], ["\\Flagged"])
-            conn.executemany("UPDATE emails SET is_starred=0 WHERE gm_msgid=?",
-                             [(r["gm_msgid"],) for r in restore])
+        subset = [r for r in rows if not r["prev"].get("starred")]
+        if subset:
+            client.unstar(_refs(subset))
+            restore_index(subset, "UPDATE emails SET is_starred=0 WHERE msg_key=?")
     elif action == LABEL:
-        client.remove_labels(uids, [rows[0]["detail"]])
+        client.remove_label(_refs(rows), rows[0]["detail"])
 
     conn.execute("UPDATE action_log SET undone=1 WHERE batch_id=?", (batch_id,))
     conn.commit()

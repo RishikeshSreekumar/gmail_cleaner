@@ -1,8 +1,25 @@
 [project]
-name = "gmail-cleaner"
+name = "mailcleaner"
 version = "0.1.0"
-description = "Local Gmail observability + cleanup dashboard (IMAP, metadata-only)"
+description = "Local multi-account mailbox observability + cleanup dashboard (IMAP, metadata-only)"
 requires-python = ">=3.11"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Rishikesh Sreekumar", email = "rishikesh.sreekumar@mando.work" }]
+keywords = ["email", "imap", "gmail", "mailbox", "cleanup", "tui", "privacy"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Email",
+    "Topic :: Utilities",
+]
 dependencies = [
     "textual>=0.80",
     "typer>=0.12",
@@ -10,15 +27,20 @@ dependencies = [
     "keyring>=25.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/RishikeshSreekumar/gmail_cleaner"
+Repository = "https://github.com/RishikeshSreekumar/gmail_cleaner"
+Issues = "https://github.com/RishikeshSreekumar/gmail_cleaner/issues"
+Changelog = "https://github.com/RishikeshSreekumar/gmail_cleaner/blob/main/CHANGELOG.md"
+
 [project.scripts]
-gclean = "gmail_cleaner.cli:app"
+mclean = "mailcleaner.cli:app"
+# Kept so existing shells and docs keep working.
+gclean = "mailcleaner.cli:app"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["gmail_cleaner"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"gmail_cleaner/static" = "gmail_cleaner/static"
+packages = ["mailcleaner"]

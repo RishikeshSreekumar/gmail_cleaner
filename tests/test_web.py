@@ -3,22 +3,39 @@
 import json
 import os
 import sys
-import tempfile
 import threading
 import urllib.error
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-tmp = tempfile.mkdtemp()
-os.environ["GMAIL_CLEANER_HOME"] = tmp
+from make_fixture import build, sandbox  # noqa: E402
 
-from gmail_cleaner import db, web  # noqa: E402
-from gmail_cleaner.config import Config  # noqa: E402
-from make_fixture import build  # noqa: E402
+sandbox()
 
-conn = db.connect()
-build(conn)
-Config(email="me@example.com").save()
+from mailcleaner import accounts as acct_mod  # noqa: E402
+from mailcleaner import db, web  # noqa: E402
+from mailcleaner.accounts import Store  # noqa: E402
+
+
+class OkBackend:
+    """Stands in for a real IMAP connection while adding accounts."""
+
+    def __init__(self, account):
+        self.account = account
+
+    def __enter__(self):
+        if "bad" in self.account.email:
+            raise acct_mod.providers.MailError("server rejected the login")
+        return self
+
+    def __exit__(self, *a):
+        pass
+
+    def sync_folders(self):
+        return ["INBOX", "Archive"]
+
+
+acct_mod.backend = OkBackend   # web.py resolves this at call time
 
 server = web.Server(("127.0.0.1", 0), token="tok", verbose=False)
 port = server.server_address[1]
@@ -44,6 +61,68 @@ def call(path, body=None, token="tok", host=None):
 status, page = urllib.request.urlopen(BASE + "/").status, None
 assert status == 200
 print("page served OK")
+
+# -- connecting mailboxes from the page ------------------------------------
+code, d = call("/api/overview")
+assert code == 200 and d["needs_setup"] is True and d["accounts"] == [], d
+print("with nothing configured, overview asks the page to onboard")
+
+code, d = call("/api/providers")
+keys = {r["key"]: r for r in d["rows"]}
+assert keys["gmail"]["uses_oauth"] is False and keys["outlook"]["uses_oauth"] is True
+assert keys["imap"]["ask_host"] is True and keys["gmail"]["ask_host"] is False
+assert "[b]" not in keys["gmail"]["help"] and "apppasswords" in keys["gmail"]["help"]
+print("providers endpoint lists", len(keys), "services with plain-text setup steps")
+
+for bad, why in (
+    ({"provider": "nope", "email": "a@b.com", "password": "x"}, "unknown provider"),
+    ({"provider": "gmail", "email": "notanemail", "password": "x"}, "email address"),
+    ({"provider": "gmail", "email": "a@b.com"}, "app password"),
+    ({"provider": "outlook", "email": "a@b.com", "password": "x"}, "browser"),
+    ({"provider": "imap", "email": "a@b.com", "password": "x", "host": "h",
+      "port": "99999"}, "port"),
+    ({"provider": "imap", "email": "a@b.com", "password": "x", "host": "h",
+      "security": "plaintext"}, "security"),
+):
+    code, data = call("/api/account/add", bad)
+    assert code == 400 and why in data["error"], (bad, code, data)
+print("the add form validates provider, address, password, port and TLS mode")
+
+code, data = call("/api/account/add", {"provider": "gmail", "email": "bad@gmail.com",
+                                       "password": "secret"})
+assert code == 502 and "rejected" in data["error"], data
+assert Store.load().accounts == [], "a mailbox that will not open is never kept"
+print("a failed connection adds nothing and leaves no credential behind")
+
+code, d = call("/api/account/add", {"provider": "gmail", "email": "me@gmail.com",
+                                    "password": "app pass word here"})
+assert code == 200 and d["folders"] == ["INBOX", "Archive"], d
+gmail = Store.load().require(d["id"])
+assert acct_mod.get_secret(gmail).password == "apppasswordhere", "spaces are stripped"
+code, d2 = call("/api/account/add", {"provider": "fastmail", "email": "me@fastmail.com",
+                                     "label": "work", "password": "pw"})
+other = Store.load().require(d2["id"])
+assert Store.load().active == other.id, "a newly added mailbox becomes active"
+print("added two mailboxes from the page:", gmail.id, "/", other.id)
+
+code, data = call("/api/account/add", {"provider": "gmail", "email": "me@gmail.com",
+                                       "password": "pw"})
+assert code == 400 and "already connected" in data["error"], data
+
+code, data = call("/api/account/oauth/start", {"provider": "gmail",
+                                               "email": "second@gmail.com"})
+assert code == 400 and "app password" in data["error"], data
+print("duplicates and mismatched sign-in styles are rejected")
+
+# No endpoint ever hands a stored credential back to the browser.
+for path in ("/api/accounts", "/api/overview"):
+    code, d = call(path)
+    assert "apppasswordhere" not in json.dumps(d), path
+print("no endpoint echoes a stored credential")
+
+build(db.connect(gmail))
+build(db.connect(other), n=140, seed=11, folder="INBOX")
+call("/api/account/use", {"id": gmail.id})
 
 for path in ("/api/overview", "/api/senders?limit=5", "/api/domains?limit=5",
              "/api/categories", "/api/ages", "/api/frequency",
@@ -103,13 +182,30 @@ code, data = call("/api/action", {"action": "trash",
 assert code == 400 and "disabled" in data["error"], data
 print("read-only mode blocks actions")
 
-cfg = Config.load()
-cfg.actions_enabled = True
-cfg.save()
+store = Store.load()
+active = store.current
+active.actions_enabled = True
+store.update(active)
 code, data = call("/api/action", {"action": "delete_forever",
                                   "target": {"kind": "sender", "value": "x@y.com"}})
 assert code == 400 and "unknown action" in data["error"], data
 print("no permanent-delete action exists")
+
+# Every account is listed, and switching changes which index answers queries.
+code, d = call("/api/overview")
+assert {a["id"] for a in d["accounts"]} == {gmail.id, other.id}, d["accounts"]
+assert d["account_id"] == gmail.id and d["stats"]["total"] == 900, d
+code, d = call("/api/account/use", {"id": other.id})
+assert code == 200 and d["active"] == other.id, d
+code, d = call("/api/overview")
+assert d["account_id"] == other.id and d["stats"]["total"] == 140, d
+assert d["actions_enabled"] is False, "enabling actions is per account"
+print("account switch: overview now reports the other mailbox,", d["stats"]["total"], "rows")
+
+code, d = call("/api/account/use", {"id": "no-such-account"})
+assert code == 400, (code, d)
+call("/api/account/use", {"id": gmail.id})
+print("unknown account ids are rejected")
 
 server.shutdown()
 print("\nWEB SMOKE TESTS PASSED")
