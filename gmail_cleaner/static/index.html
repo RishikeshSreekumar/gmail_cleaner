@@ -1,0 +1,1104 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gclean</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Warm paper, ink-brown text, one terracotta accent and one green that only
+     ever means "protected". Deliberately a single light theme.
+     Fonts are fetched if the machine is online and fall back cleanly if not. */
+  :root {
+    --bg:      oklch(0.968 0.009 85);
+    --panel:   oklch(0.985 0.006 85);
+    --card:    oklch(0.995 0.004 85);
+    --raised:  oklch(0.955 0.010 82);
+    --white:   oklch(1 0 0);
+    --line:    oklch(0.90 0.012 80);
+    --line2:   oklch(0.86 0.014 80);
+    --hair:    oklch(0.945 0.010 82);
+    --ink:     oklch(0.24 0.012 60);
+    --ink2:    oklch(0.30 0.012 60);
+    --dim:     oklch(0.55 0.012 60);
+    --dim2:    oklch(0.58 0.012 60);
+    --accent:  oklch(0.50 0.13 40);
+    --accent-d:oklch(0.44 0.13 40);
+    --accent-l:oklch(0.96 0.03 45);
+    --green:   oklch(0.50 0.11 150);
+    --green-d: oklch(0.46 0.10 150);
+    --green-bg:oklch(0.97 0.02 150);
+    --green-ln:oklch(0.86 0.05 150);
+    --up:      oklch(0.52 0.14 35);
+    --bar:     oklch(0.93 0.022 70);
+    --dark:    oklch(0.22 0.012 60);
+    --mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: Geist, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); }
+  body { font-family: var(--sans); font-size: 14px; color: var(--ink);
+         -webkit-font-smoothing: antialiased; min-height: 100vh; }
+  ::selection { background: oklch(0.88 0.05 150); }
+  .mono { font-family: var(--mono); }
+  .num  { font-variant-numeric: tabular-nums; }
+
+  /* ---------- header ---------- */
+  header { display: flex; align-items: center; gap: 20px; padding: 14px 28px;
+    border-bottom: 1px solid var(--line); background: var(--panel);
+    position: sticky; top: 0; z-index: 20; }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand b { font-family: var(--mono); font-size: 14px; font-weight: 500;
+    letter-spacing: -0.01em; color: var(--accent); }
+  .brand span { font-size: 13px; color: var(--dim); }
+  .seg { display: flex; gap: 2px; padding: 2px; background: oklch(0.94 0.012 82);
+    border-radius: 8px; margin-left: 8px; }
+  .seg button { padding: 5px 11px; border: none; border-radius: 6px;
+    font-family: var(--sans); font-size: 12.5px; cursor: pointer;
+    background: none; color: oklch(0.45 0.012 60); }
+  .seg button.on { font-weight: 500; background: var(--white); color: var(--ink);
+    box-shadow: 0 1px 2px oklch(0.24 0.012 60 / 0.1); }
+  .spacer { flex: 1; }
+  .headstat { font-size: 13px; color: var(--dim); }
+
+  /* ---------- buttons ---------- */
+  .btn { padding: 7px 16px; border: 1px solid var(--line2); background: var(--white);
+    border-radius: 8px; font-family: var(--sans); font-size: 13px; font-weight: 500;
+    color: var(--ink2); cursor: pointer; }
+  .btn:hover:not(:disabled) { border-color: oklch(0.7 0.02 80); }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn.primary { padding: 9px 16px; border: none; background: var(--accent);
+    color: oklch(0.99 0.005 85); }
+  .btn.primary:hover:not(:disabled) { background: var(--accent-d); }
+  .btn.big { padding: 11px 20px; font-size: 14px; }
+  .btn.link { background: none; border: none; padding: 0; color: var(--accent);
+    font-size: 13px; font-weight: 500; cursor: pointer; }
+  .btn.link:hover { text-decoration: underline; }
+  .btn.quiet { border: none; background: none; color: var(--dim); padding: 9px 14px;
+    font-weight: 400; }
+
+  /* ---------- shell ---------- */
+  .shell { display: flex; align-items: flex-start; }
+  nav { width: 186px; flex: none; padding: 24px 16px; position: sticky; top: 57px;
+    display: flex; flex-direction: column; gap: 2px; }
+  nav button { text-align: left; padding: 8px 10px; border: none; border-radius: 7px;
+    font-family: var(--sans); font-size: 14px; cursor: pointer; background: none;
+    color: oklch(0.38 0.012 60); }
+  nav button:hover { background: oklch(0.945 0.012 80); }
+  nav button.on { font-weight: 500; background: oklch(0.92 0.02 60); color: var(--dark); }
+  nav .rule { height: 1px; background: var(--line); margin: 14px 10px; }
+  nav .note { padding: 0 10px; font-size: 12px; line-height: 1.6; color: oklch(0.6 0.012 60); }
+  nav .note .row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .swatch { width: 7px; height: 7px; border-radius: 2px; background: var(--green);
+    display: inline-block; flex: none; }
+  main { flex: 1; min-width: 0; padding: 24px 28px 140px 12px; max-width: 1320px; }
+
+  /* ---------- overview ---------- */
+  .hero { display: flex; align-items: flex-end; gap: 40px; flex-wrap: wrap;
+    padding-bottom: 26px; border-bottom: 1px solid var(--line); }
+  .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--dim2); margin-bottom: 8px; }
+  .figure { font-size: 44px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+  .under { font-size: 13px; color: var(--dim); margin-top: 8px; line-height: 1.5; }
+  .vrule { width: 1px; align-self: stretch; background: var(--line); }
+  section { padding: 28px 0 4px; }
+  section h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+  section p.sub { margin: 0 0 18px; font-size: 13px; color: var(--dim); }
+  h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  p.lede { margin: 0 0 18px; font-size: 13px; color: var(--dim); }
+
+  .stack { display: flex; height: 38px; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--line); }
+  .stack div { display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-family: var(--mono); color: oklch(0.3 0.02 70); overflow: hidden; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 14px; }
+  .legend .item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .legend .key { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex: none; }
+  .legend .name { color: var(--ink2); }
+  .legend .val { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+  .sechead { display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 14px; gap: 16px; }
+
+  /* ---------- sender table ---------- */
+  .tbl { border: 1px solid var(--line); border-radius: 11px; overflow-x: auto;
+    background: var(--card); }
+  .tbl .head, .tbl .row { display: grid; align-items: center; min-width: 740px; }
+  .tbl .head { padding: 9px 16px; background: var(--raised);
+    border-bottom: 1px solid var(--line); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.07em; color: oklch(0.52 0.012 60); }
+  .tbl .row { padding: 0 16px; height: 38px; border-bottom: 1px solid var(--hair);
+    font-size: 13px; cursor: pointer; }
+  .tbl .row:last-child { border-bottom: 0; }
+  .tbl .row:hover { background: oklch(0.965 0.014 82); }
+  .tbl .row.on { background: oklch(0.965 0.022 55); }
+  .tbl .r { text-align: right; }
+  .tbl .c { text-align: center; }
+  .cellsender { min-width: 0; position: relative; padding-right: 14px; }
+  .cellsender .bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    height: 20px; background: var(--bar); border-radius: 3px; }
+  .cellsender .txt { position: relative; font-family: var(--mono); font-size: 12.5px;
+    color: oklch(0.26 0.012 60); overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; }
+  .box { width: 15px; height: 15px; border-radius: 4px; display: flex;
+    align-items: center; justify-content: center; font-size: 10px; cursor: pointer;
+    background: var(--white); border: 1px solid oklch(0.8 0.014 80); color: transparent; }
+  .box.on { background: var(--accent); border-color: var(--accent); color: oklch(0.99 0.005 85); }
+  .prot0 { color: oklch(0.66 0.012 60); }
+  .prot1 { color: var(--green-d); }
+  .empty { padding: 26px 16px; font-size: 13px; color: var(--dim); }
+
+  /* ---------- senders toolbar ---------- */
+  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 16px; }
+  .toolbar input { width: 280px; padding: 9px 12px; border: 1px solid oklch(0.88 0.014 80);
+    border-radius: 8px; background: var(--white); font-family: var(--sans);
+    font-size: 13px; color: var(--ink); outline: none; }
+  .toolbar input:focus { border-color: oklch(0.6 0.06 40); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { padding: 8px 13px; border: 1px solid oklch(0.89 0.014 80); border-radius: 8px;
+    font-family: var(--sans); font-size: 13px; cursor: pointer; background: var(--white);
+    color: oklch(0.4 0.012 60); }
+  .chip.on { border-color: var(--accent); font-weight: 500; background: var(--accent-l);
+    color: var(--accent-d); }
+  .notice { margin-top: 14px; display: flex; align-items: center; gap: 10px;
+    padding: 11px 14px; border: 1px solid var(--line); border-radius: 9px;
+    background: var(--panel); font-size: 13px; color: oklch(0.45 0.012 60); flex-wrap: wrap; }
+
+  /* ---------- cleanup ---------- */
+  .batches { display: flex; flex-direction: column; gap: 12px; max-width: 900px; }
+  .batch { display: flex; align-items: center; gap: 22px; padding: 18px 20px;
+    border: 1px solid var(--line); border-radius: 11px; background: var(--card);
+    flex-wrap: wrap; }
+  .batch:hover { border-color: oklch(0.78 0.02 80); }
+  .batch .title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
+    margin-bottom: 5px; }
+  .batch .detail { font-size: 13px; color: oklch(0.52 0.012 60); line-height: 1.5; }
+  .batch .big { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  .batch .cap { font-size: 12px; color: var(--dim2); }
+  .safe { margin-top: 22px; padding: 18px 20px; border: 1px solid var(--green-ln);
+    border-radius: 11px; background: var(--green-bg); max-width: 900px;
+    display: flex; align-items: center; gap: 16px; }
+  .safe .swatch { width: 9px; height: 9px; }
+  .safe .txt { font-size: 13px; color: oklch(0.32 0.03 150); line-height: 1.5; }
+
+  /* ---------- selection bar ---------- */
+  #selbar { position: fixed; bottom: 20px; left: 0; right: 0; display: flex;
+    justify-content: center; pointer-events: none; z-index: 30; }
+  #selbar .inner { display: flex; align-items: center; gap: 18px;
+    padding: 12px 14px 12px 20px; background: var(--dark); border-radius: 12px;
+    box-shadow: 0 8px 28px oklch(0.24 0.012 60 / 0.28); pointer-events: auto;
+    max-width: calc(100vw - 32px); flex-wrap: wrap; }
+  #selbar .label { font-size: 13px; color: oklch(0.95 0.006 85); white-space: nowrap; }
+  #selbar .clear { background: none; border: none; padding: 0; font-family: var(--sans);
+    font-size: 13px; color: oklch(0.72 0.012 60); cursor: pointer; }
+  #selbar .acts { display: flex; gap: 8px; }
+  #selbar .acts button { padding: 8px 14px; border: 1px solid oklch(0.38 0.012 60);
+    background: none; border-radius: 8px; font-family: var(--sans); font-size: 13px;
+    color: oklch(0.95 0.006 85); cursor: pointer; }
+  #selbar .acts button:hover { background: oklch(0.28 0.012 60); }
+  #selbar .acts button.danger { padding: 8px 16px; border: none; font-weight: 500;
+    background: oklch(0.58 0.15 40); color: oklch(0.99 0.005 85); }
+  #selbar .acts button.danger:hover { background: oklch(0.52 0.15 40); }
+
+  /* ---------- modal ---------- */
+  #scrim { position: fixed; inset: 0; background: oklch(0.24 0.012 60 / 0.4); z-index: 40;
+    display: flex; align-items: center; justify-content: center; padding: 40px; }
+  .sheet { width: 840px; max-width: 100%; max-height: 100%; display: flex;
+    flex-direction: column; background: oklch(0.99 0.005 85); border-radius: 14px;
+    box-shadow: 0 24px 60px oklch(0.24 0.012 60 / 0.3); overflow: hidden; }
+  .sheet .top { padding: 22px 26px 20px; border-bottom: 1px solid var(--line); }
+  .sheet .toprow { display: flex; align-items: flex-start; gap: 16px; }
+  .sheet .who { font-family: var(--mono); font-size: 18px; font-weight: 500;
+    letter-spacing: -0.01em; word-break: break-all; }
+  .sheet .x { flex: none; width: 30px; height: 30px; border: 1px solid oklch(0.88 0.014 80);
+    background: var(--white); border-radius: 8px; font-size: 15px; color: oklch(0.5 0.012 60);
+    cursor: pointer; line-height: 1; }
+  .sheet .x:hover { border-color: oklch(0.7 0.02 80); }
+  .sheet .stats { display: flex; gap: 36px; margin-top: 20px; flex-wrap: wrap; }
+  .sheet .stats .v { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .sheet .stats .k { font-size: 12px; color: oklch(0.56 0.012 60); margin-top: 3px; }
+  .sheet .body { overflow-y: auto; padding: 22px 26px 26px; }
+  .sheet h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: oklch(0.5 0.012 60); }
+  .sheet h3 + * + h3 { margin-top: 28px; }
+  .catrow { display: flex; align-items: center; gap: 14px; margin-bottom: 9px; }
+  .catrow .n { width: 96px; flex: none; font-size: 13px; color: var(--ink2); }
+  .catrow .track { flex: 1; height: 22px; background: oklch(0.945 0.01 82);
+    border-radius: 4px; overflow: hidden; }
+  .catrow .fill { height: 100%; border-radius: 4px; }
+  .catrow .c { width: 52px; flex: none; text-align: right; font-family: var(--mono);
+    font-size: 13px; }
+  .catrow .p { width: 116px; flex: none; text-align: right; font-size: 12px; }
+  .subjects { display: flex; flex-direction: column; border: 1px solid oklch(0.91 0.012 80);
+    border-radius: 9px; overflow: hidden; }
+  .subjects .s { display: flex; gap: 16px; padding: 11px 14px;
+    border-bottom: 1px solid var(--hair); background: var(--card); }
+  .subjects .s:last-child { border-bottom: 0; }
+  .subjects .t { flex: 1; font-size: 13px; color: oklch(0.28 0.012 60);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .subjects .w { flex: none; font-size: 12px; color: var(--dim2); }
+  .sheet .foot { padding: 14px 26px; border-top: 1px solid var(--line);
+    background: oklch(0.975 0.008 85); display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap; }
+  .sheet .foot .msg { flex: 1; font-size: 13px; color: oklch(0.5 0.012 60); min-width: 200px; }
+  code { background: oklch(0.945 0.012 82); padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--line); font-family: var(--mono); font-size: 12px; }
+
+  #toast { position: fixed; right: 20px; bottom: 20px; z-index: 60; background: var(--dark);
+    color: oklch(0.95 0.006 85); border-radius: 10px; padding: 11px 16px; font-size: 13px;
+    box-shadow: 0 8px 28px oklch(0.24 0.012 60 / 0.28); display: none; max-width: 420px; }
+  #toast.bad { background: oklch(0.42 0.14 30); }
+  .err { color: oklch(0.48 0.15 30); }
+</style>
+
+<header>
+  <div class="brand"><b>gclean</b><span id="account">—</span></div>
+  <div class="seg">
+    <button id="seg-ro">Read-only</button>
+    <button id="seg-on">Actions on</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="headstat num" id="headstat"></span>
+  <button class="btn" id="btn-sync">Sync</button>
+</header>
+
+<div class="shell">
+  <nav id="nav"></nav>
+  <main id="main"></main>
+</div>
+
+<div id="mount"></div>
+<div id="toast"></div>
+
+<script>
+/* ---------- transport ---------- */
+const TOKEN = (() => {
+  const u = new URL(location.href);
+  const t = u.searchParams.get('t');
+  if (t) { sessionStorage.setItem('gc-token', t);
+           history.replaceState({}, '', u.pathname); }
+  return t || sessionStorage.getItem('gc-token') || '';
+})();
+
+async function api(path, body) {
+  const res = await fetch('/api/' + path, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { 'X-Token': TOKEN, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({ error: 'bad response' }));
+  if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+/* ---------- helpers ---------- */
+const $ = (s) => document.querySelector(s);
+function el(tag, props = {}, kids = []) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'style' && typeof v === 'string') n.setAttribute('style', v);
+    else n[k] = v;
+  }
+  for (const c of [].concat(kids)) if (c != null && c !== false) n.append(c);
+  return n;
+}
+const num = (n) => (n || 0).toLocaleString();
+function size(n) {
+  n = n || 0;
+  for (const u of ['B', 'KB', 'MB', 'GB', 'TB']) {
+    if (n < 1024) return u === 'B' ? `${n | 0} B` : `${n.toFixed(1)} ${u}`;
+    n /= 1024;
+  }
+  return `${n.toFixed(1)} PB`;
+}
+function ago(ts) {
+  if (!ts) return '—';
+  const d = (Date.now() / 1000 - ts) / 86400;
+  if (d < 1) return 'today';
+  if (d < 2) return 'yesterday';
+  if (d < 30) return `${d | 0}d`;
+  if (d < 365) return `${(d / 30) | 0}mo`;
+  return `${(d / 365).toFixed(1)}y`;
+}
+const when = (ts) => (ts ? new Date(ts * 1000).toLocaleString() : '—');
+
+let toastTimer;
+function toast(msg, bad) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = bad ? 'bad' : '';
+  t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.style.display = 'none'), 5000);
+}
+
+/* ---------- state ---------- */
+const S = {
+  tab: 'overview',
+  actions: false,
+  selected: new Set(),
+  query: '',
+  filter: 'All',
+  senders: [],
+  overview: null,
+};
+
+const DOMAIN_COLORS = [
+  'oklch(0.78 0.075 45)', 'oklch(0.84 0.055 55)', 'oklch(0.87 0.045 90)',
+  'oklch(0.85 0.05 130)', 'oklch(0.87 0.04 160)', 'oklch(0.89 0.03 190)',
+];
+const OTHER_COLOR = 'oklch(0.93 0.012 82)';
+
+const TREND = {
+  up:    { label: '↑ rising',  color: 'var(--up)' },
+  new:   { label: '↑ new',     color: 'var(--up)' },
+  down:  { label: '↓ falling', color: 'var(--green)' },
+  flat:  { label: '→ flat',    color: 'var(--dim2)' },
+  '-':   { label: 'dormant',   color: 'oklch(0.62 0.012 60)' },
+};
+
+/* Actions the server will actually accept. There is no unsubscribe and no
+   permanent delete anywhere in this tool; trash is Gmail's, and reversible. */
+const ACTIONS = [
+  { id: 'mark_read', label: 'Mark read' },
+  { id: 'archive',   label: 'Archive' },
+  { id: 'trash',     label: 'Trash', danger: true,
+    title: 'Moves to Gmail Trash — recoverable for 30 days, and undoable from History' },
+];
+
+/* ---------- sender table ---------- */
+const COLS = 'minmax(200px,1fr) 66px 66px 60px 74px 78px 58px 92px';
+
+function senderTable(rows, { selectable = false, max = 0, bars = true } = {}) {
+  const cols = (selectable ? '26px ' : '') + COLS;
+  const wrap = el('div', { className: 'tbl' });
+  const head = el('div', { className: 'head', style: `grid-template-columns:${cols}` });
+  if (selectable) head.append(el('div'));
+  head.append(el('div', { textContent: 'Sender' }));
+  [['Emails', 'r'], ['Unread', 'r'], ['/Week', 'r'], ['Trend', 'c'],
+   ['Size', 'r'], ['Last', 'r'], ['Protected', 'r']]
+    .forEach(([t, c]) => head.append(el('div', { className: c, textContent: t })));
+  wrap.append(head);
+
+  const peak = max || Math.max(1, ...rows.map((r) => r.emails || 0));
+
+  for (const r of rows) {
+    const on = S.selected.has(r.key);
+    const row = el('div', {
+      className: 'row' + (on ? ' on' : ''),
+      style: `grid-template-columns:${cols}`,
+      title: 'Open sender',
+    });
+    row.onclick = () => openSender(r.key);
+
+    if (selectable) {
+      const box = el('span', { className: 'box' + (on ? ' on' : ''), textContent: '✓' });
+      const cell = el('div', { style: 'display:flex; align-items:center' }, box);
+      cell.onclick = (e) => { e.stopPropagation(); toggle(r.key); };
+      row.append(cell);
+    }
+
+    const s = el('div', { className: 'cellsender' });
+    if (bars) {
+      const w = Math.max(4, ((r.emails || 0) / peak) * 100);
+      s.append(el('div', { className: 'bar', style: `width:${w}%` }));
+    }
+    s.append(el('div', { className: 'txt', textContent: r.key || '(unknown)' }));
+    row.append(s);
+
+    const t = TREND[r.trend] || TREND.flat;
+    row.append(el('div', { className: 'r num', style: 'font-weight:500',
+      textContent: num(r.emails) }));
+    row.append(el('div', { className: 'r num', style: 'color:var(--dim)',
+      textContent: num(r.unread) }));
+    row.append(el('div', { className: 'r num', style: 'color:var(--dim)',
+      textContent: (r.per_week || 0).toFixed(1) }));
+    row.append(el('div', { className: 'c',
+      style: `font-size:12px; color:${t.color}`, textContent: t.label }));
+    row.append(el('div', { className: 'r num', style: 'color:var(--dim)',
+      textContent: size(r.bytes) }));
+    row.append(el('div', { className: 'r', style: 'font-size:12.5px; color:var(--dim2)',
+      textContent: ago(r.last_seen) }));
+    row.append(el('div', {
+      className: 'r num ' + (r.protected ? 'prot1' : 'prot0'),
+      style: 'font-size:12.5px',
+      textContent: r.protected ? num(r.protected) : '—',
+    }));
+    wrap.append(row);
+  }
+  if (!rows.length) wrap.append(el('div', { className: 'empty', textContent: 'Nothing here.' }));
+  return wrap;
+}
+
+function toggle(key) {
+  if (!S.actions) return needActions();
+  S.selected.has(key) ? S.selected.delete(key) : S.selected.add(key);
+  go(S.tab);
+}
+
+function needActions() {
+  toast('Read-only. Run `gclean enable-actions` in the terminal to allow changes.');
+}
+
+/* ---------- selection bar ---------- */
+function drawSelectionBar() {
+  const old = $('#selbar');
+  if (old) old.remove();
+  if (!S.selected.size || !S.actions) return;
+
+  const chosen = S.senders.filter((s) => S.selected.has(s.key));
+  const affected = chosen.reduce((a, s) => a + (s.emails - (s.protected || 0)), 0);
+  const target = { kind: 'senders', value: [...S.selected] };
+
+  const acts = el('div', { className: 'acts' });
+  for (const a of ACTIONS) {
+    acts.append(el('button', {
+      className: a.danger ? 'danger' : '',
+      textContent: a.label,
+      title: a.title || '',
+      onclick: () => openPreview(target, a.id),
+    }));
+  }
+  const inner = el('div', { className: 'inner' }, [
+    el('span', { className: 'label num', textContent:
+      `${S.selected.size} sender${S.selected.size === 1 ? '' : 's'} · ` +
+      `${num(affected)} messages affected` }),
+    el('button', { className: 'clear', textContent: 'Clear',
+      onclick: () => { S.selected.clear(); go(S.tab); } }),
+    acts,
+  ]);
+  document.body.append(el('div', { id: 'selbar' }, inner));
+}
+
+/* ---------- modal plumbing ---------- */
+function openSheet(build) {
+  closeSheet();
+  const sheet = el('div', { className: 'sheet' });
+  sheet.onclick = (e) => e.stopPropagation();
+  const scrim = el('div', { id: 'scrim', onclick: closeSheet }, sheet);
+  $('#mount').append(scrim);
+  document.addEventListener('keydown', escClose);
+  build(sheet);
+  return sheet;
+}
+function closeSheet() {
+  const s = $('#scrim');
+  if (s) s.remove();
+  document.removeEventListener('keydown', escClose);
+}
+function escClose(e) { if (e.key === 'Escape') closeSheet(); }
+
+/* ---------- sender detail ---------- */
+async function openSender(email) {
+  const sheet = openSheet((s) => s.append(
+    el('div', { className: 'body', textContent: 'Loading…' })));
+  let d;
+  try {
+    d = await api('sender?value=' + encodeURIComponent(email));
+  } catch (e) {
+    sheet.textContent = '';
+    sheet.append(el('div', { className: 'body' },
+      el('p', { className: 'err', textContent: e.message })));
+    sheet.append(el('div', { className: 'foot' },
+      el('button', { className: 'btn quiet', textContent: 'Close', onclick: closeSheet })));
+    return;
+  }
+
+  const r = d.row;
+  const eligible = r.emails - (r.protected || 0);
+  sheet.textContent = '';
+
+  /* header: who, and the four numbers that decide whether to act */
+  const top = el('div', { className: 'top' });
+  top.append(el('div', { className: 'toprow' }, [
+    el('div', { style: 'flex:1; min-width:0' }, [
+      el('div', { className: 'eyebrow', textContent: 'Sender' }),
+      el('div', { className: 'who', textContent: r.key }),
+    ]),
+    el('button', { className: 'x', textContent: '✕', onclick: closeSheet }),
+  ]));
+  const stats = el('div', { className: 'stats' });
+  [[num(r.emails), 'messages', ''], [size(r.bytes), 'total size', ''],
+   [(r.per_week || 0).toFixed(1), 'per week', ''],
+   [num(r.protected), 'protected · excluded', 'color:var(--green-d)']]
+    .forEach(([v, k, st]) => stats.append(el('div', {}, [
+      el('div', { className: 'v num', style: st, textContent: v }),
+      el('div', { className: 'k', textContent: k }),
+    ])));
+  top.append(stats);
+  sheet.append(top);
+
+  /* body: what it sends, and what it looks like */
+  const body = el('div', { className: 'body' });
+  const cats = d.categories || [];
+  const peak = Math.max(1, ...cats.map((c) => c.emails));
+  body.append(el('h3', { textContent: 'What it sends' }));
+  const list = el('div', { style: 'margin-bottom:28px' });
+  for (const c of cats) {
+    const allProt = c.protected === c.emails;
+    list.append(el('div', { className: 'catrow' }, [
+      el('div', { className: 'n', textContent: c.key || '(none)' }),
+      el('div', { className: 'track' }, el('div', {
+        className: 'fill',
+        style: `width:${(c.emails / peak * 100).toFixed(1)}%; background:` +
+               (allProt ? 'oklch(0.78 0.06 150)' : 'oklch(0.82 0.07 55)'),
+      })),
+      el('div', { className: 'c num', textContent: num(c.emails) }),
+      el('div', { className: 'p num',
+        style: `color:${c.protected ? 'var(--green-d)' : 'oklch(0.6 0.012 60)'}`,
+        textContent: c.protected ? `${num(c.protected)} protected` : 'none protected' }),
+    ]));
+  }
+  if (!cats.length) list.append(el('div', { className: 'empty', textContent: 'No mail.' }));
+  body.append(list);
+
+  body.append(el('h3', { textContent: 'Recent subjects' }));
+  const subs = el('div', { className: 'subjects' });
+  for (const m of d.samples || []) {
+    subs.append(el('div', { className: 's' }, [
+      el('div', { className: 't', textContent: m.subject || '(no subject)' }),
+      el('div', { className: 'w num', textContent: ago(m.received_at) }),
+    ]));
+  }
+  if (!(d.samples || []).length) {
+    subs.append(el('div', { className: 'empty', textContent: 'Nothing to show.' }));
+  }
+  body.append(subs);
+  sheet.append(body);
+
+  /* footer: the only place an action can start from this panel */
+  const target = { kind: 'sender', value: r.key };
+  const foot = el('div', { className: 'foot' });
+  foot.append(el('span', { className: 'msg', textContent: S.actions
+    ? `${num(eligible)} messages would be affected · ${num(r.protected)} protected and excluded`
+    : 'Read-only. Nothing will be changed.' }));
+  if (!S.actions) {
+    foot.append(el('button', { className: 'btn', textContent: 'How to turn on actions',
+      onclick: needActions }));
+  } else {
+    const acts = el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap' });
+    acts.append(el('button', { className: 'btn', textContent: 'Mark read',
+      onclick: () => openPreview(target, 'mark_read') }));
+    acts.append(el('button', { className: 'btn', textContent: 'Archive',
+      onclick: () => openPreview(target, 'archive') }));
+    acts.append(el('button', { className: 'btn primary',
+      textContent: `Trash ${num(eligible)}`,
+      title: 'Moves to Gmail Trash — recoverable, and undoable from History',
+      onclick: () => openPreview(target, 'trash') }));
+    foot.append(acts);
+  }
+  foot.append(el('button', { className: 'btn quiet', textContent: 'Close', onclick: closeSheet }));
+  sheet.append(foot);
+}
+
+/* ---------- preview + confirm ---------- */
+async function openPreview(target, preferred) {
+  const sheet = openSheet((s) => s.append(
+    el('div', { className: 'body', textContent: 'Loading preview…' })));
+  let info;
+  try {
+    info = await api('preview', { target });
+  } catch (e) {
+    sheet.textContent = '';
+    sheet.append(el('div', { className: 'body' },
+      el('p', { className: 'err', textContent: e.message })));
+    sheet.append(el('div', { className: 'foot' },
+      el('button', { className: 'btn quiet', textContent: 'Close', onclick: closeSheet })));
+    return;
+  }
+  sheet.textContent = '';
+
+  const top = el('div', { className: 'top' });
+  top.append(el('div', { className: 'toprow' }, [
+    el('div', { style: 'flex:1; min-width:0' }, [
+      el('div', { className: 'eyebrow', textContent: 'Selection' }),
+      el('div', { style: 'font-size:18px; font-weight:600; letter-spacing:-0.01em',
+        textContent: info.title }),
+    ]),
+    el('button', { className: 'x', textContent: '✕', onclick: closeSheet }),
+  ]));
+  const stats = el('div', { className: 'stats' });
+  [[num(info.eligible), 'would be affected', ''], [size(info.bytes), 'total size', ''],
+   [num(info.protected), 'protected · excluded', 'color:var(--green-d)'],
+   [info.oldest ? `${ago(info.newest)} – ${ago(info.oldest)}` : '—', 'age range', '']]
+    .forEach(([v, k, st]) => stats.append(el('div', {}, [
+      el('div', { className: 'v num', style: st, textContent: v }),
+      el('div', { className: 'k', textContent: k }),
+    ])));
+  top.append(stats);
+  sheet.append(top);
+
+  const body = el('div', { className: 'body' });
+  const cats = info.categories || [];
+  if (cats.length) {
+    const peak = Math.max(1, ...cats.map((c) => c.emails));
+    body.append(el('h3', { textContent: 'What is in the selection' }));
+    const list = el('div', { style: 'margin-bottom:28px' });
+    for (const c of cats.slice(0, 8)) {
+      list.append(el('div', { className: 'catrow' }, [
+        el('div', { className: 'n', textContent: c.key || '(none)' }),
+        el('div', { className: 'track' }, el('div', { className: 'fill',
+          style: `width:${(c.emails / peak * 100).toFixed(1)}%; background:` +
+                 (c.protected === c.emails ? 'oklch(0.78 0.06 150)' : 'oklch(0.82 0.07 55)') })),
+        el('div', { className: 'c num', textContent: num(c.emails) }),
+        el('div', { className: 'p num',
+          style: `color:${c.protected ? 'var(--green-d)' : 'oklch(0.6 0.012 60)'}`,
+          textContent: c.protected ? `${num(c.protected)} protected` : 'none protected' }),
+      ]));
+    }
+    body.append(list);
+  }
+  body.append(el('h3', { textContent: 'Examples' }));
+  const subs = el('div', { className: 'subjects' });
+  for (const m of (info.samples || []).slice(0, 6)) {
+    subs.append(el('div', { className: 's' }, [
+      el('div', { className: 't',
+        textContent: `${m.from_email} — ${m.subject || '(no subject)'}` }),
+      el('div', { className: 'w num', textContent: ago(m.received_at) }),
+    ]));
+  }
+  if (!(info.samples || []).length) {
+    subs.append(el('div', { className: 'empty', textContent: 'Nothing eligible.' }));
+  }
+  body.append(subs);
+  sheet.append(body);
+
+  const foot = el('div', { className: 'foot' });
+  if (!S.actions) {
+    const msg = el('span', { className: 'msg' });
+    msg.append('Read-only. Run ');
+    msg.append(el('code', { textContent: 'gclean enable-actions' }));
+    msg.append(' in the terminal to allow changes.');
+    foot.append(msg);
+  } else if (!info.eligible) {
+    foot.append(el('span', { className: 'msg',
+      textContent: 'Nothing eligible — everything here is protected.' }));
+  } else {
+    foot.append(el('span', { className: 'msg',
+      textContent: `${num(info.eligible)} messages · this is reversible from History.` }));
+    const run = async (action) => {
+      foot.querySelectorAll('button').forEach((b) => (b.disabled = true));
+      try {
+        const res = await api('action', { action, target });
+        toast(`${action.replace('_', ' ')}: ${num(res.count)} messages` +
+              (res.skipped ? `, ${num(res.skipped)} protected skipped` : '') +
+              '. Undo from History.');
+        closeSheet();
+        S.selected.clear();
+        await refreshHeader();
+        go(S.tab);
+      } catch (e) {
+        toast(e.message, true);
+        foot.querySelectorAll('button').forEach((b) => (b.disabled = false));
+      }
+    };
+    const acts = el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap' });
+    for (const a of ACTIONS) {
+      acts.append(el('button', {
+        className: 'btn' + (a.id === preferred ? ' primary' : ''),
+        textContent: a.id === preferred ? `${a.label} ${num(info.eligible)}` : a.label,
+        title: a.title || '',
+        onclick: () => run(a.id),
+      }));
+    }
+    acts.append(el('button', { className: 'btn', textContent: 'Label for review',
+      onclick: () => run('label') }));
+    foot.append(acts);
+  }
+  foot.append(el('button', { className: 'btn quiet', textContent: 'Close', onclick: closeSheet }));
+  sheet.append(foot);
+}
+
+/* ---------- simple table for the secondary views ---------- */
+function plainTable(cols, rows, onClick) {
+  const grid = cols.map((c) => c.w || '1fr').join(' ');
+  const wrap = el('div', { className: 'tbl' });
+  const head = el('div', { className: 'head', style: `grid-template-columns:${grid}` });
+  cols.forEach((c) => head.append(el('div', {
+    className: c.r ? 'r' : '', textContent: c.label })));
+  wrap.append(head);
+  for (const r of rows) {
+    const row = el('div', { className: 'row', style: `grid-template-columns:${grid}` });
+    if (onClick) row.onclick = () => onClick(r); else row.style.cursor = 'default';
+    cols.forEach((c) => row.append(el('div', {
+      className: (c.r ? 'r num ' : '') + (c.cls ? c.cls(r) : ''),
+      style: 'overflow:hidden; text-overflow:ellipsis; white-space:nowrap',
+      textContent: c.fmt ? c.fmt(r) : (r[c.key] ?? ''),
+    })));
+    wrap.append(row);
+  }
+  if (!rows.length) wrap.append(el('div', { className: 'empty', textContent: 'Nothing here.' }));
+  return wrap;
+}
+
+/* ---------- views ---------- */
+const VIEWS = {};
+
+VIEWS.overview = async (main) => {
+  const d = S.overview || (S.overview = await api('overview'));
+  const s = d.stats;
+  S.senders = d.top_senders;
+
+  /* two headline numbers: what you have, and what is safe to lose */
+  const hero = el('div', { className: 'hero' });
+  hero.append(el('div', {}, [
+    el('div', { className: 'eyebrow', textContent: 'Mailbox' }),
+    el('div', { className: 'figure num', textContent: size(s.bytes) }),
+    el('div', { className: 'under num', textContent:
+      `${num(s.total)} messages · ${num(s.senders)} senders · ${num(s.unread)} unread` }),
+  ]));
+  hero.append(el('div', { className: 'vrule' }));
+  hero.append(el('div', { style: 'max-width:420px' }, [
+    el('div', { className: 'eyebrow', textContent: 'Safe to clean' }),
+    el('div', { className: 'figure num', style: 'color:var(--accent)',
+      textContent: size(s.cleanup_bytes) }),
+    el('div', { className: 'under', style: 'color:oklch(0.42 0.012 60)', textContent:
+      `${num(s.cleanup)} messages from ${num(s.cleanup_senders)} senders. ` +
+      'Protected mail is excluded.' }),
+  ]));
+  hero.append(el('button', { className: 'btn primary big', textContent: 'Review cleanup',
+    onclick: () => go('cleanup') }));
+  main.append(hero);
+
+  /* where the volume comes from */
+  const doms = d.top_domains.slice(0, 6);
+  const shown = doms.reduce((a, x) => a + x.emails, 0);
+  const restCount = Math.max(0, s.total - shown);
+  const restBytes = Math.max(0, (s.bytes || 0) - doms.reduce((a, x) => a + (x.bytes || 0), 0));
+  const restSenders = Math.max(0, s.domains - doms.length);
+  const parts = doms.map((x, i) => ({
+    name: x.key, emails: x.emails, bytes: x.bytes, color: DOMAIN_COLORS[i],
+  }));
+  if (restCount) parts.push({ name: `${num(restSenders)} others`, emails: restCount,
+    bytes: restBytes, color: OTHER_COLOR });
+  const total = Math.max(1, parts.reduce((a, x) => a + x.emails, 0));
+
+  const sec1 = el('section');
+  sec1.append(el('h2', { textContent: 'Where the volume comes from' }));
+  sec1.append(el('p', { className: 'sub', textContent:
+    `${doms.length} domains account for ${Math.round(shown / Math.max(1, s.total) * 100)}% ` +
+    'of everything in your mailbox.' }));
+  const stack = el('div', { className: 'stack' });
+  for (const p of parts) {
+    const pct = p.emails / total;
+    stack.append(el('div', {
+      title: `${p.name} — ${num(p.emails)}`,
+      style: `width:${(pct * 100).toFixed(2)}%; background:${p.color}`,
+      textContent: pct > 0.06 ? p.name.replace(/\.(com|in|net|org|so|io|co\.in|co\.uk)$/, '') : '',
+    }));
+  }
+  sec1.append(stack);
+  const legend = el('div', { className: 'legend' });
+  for (const p of parts) {
+    legend.append(el('div', { className: 'item' }, [
+      el('span', { className: 'key', style: `background:${p.color}` }),
+      el('span', { className: 'name', textContent: p.name }),
+      el('span', { className: 'val num', textContent: `${num(p.emails)} · ${size(p.bytes)}` }),
+    ]));
+  }
+  sec1.append(legend);
+  main.append(sec1);
+
+  /* the loudest senders */
+  const sec2 = el('section', { style: 'padding-top:30px' });
+  sec2.append(el('div', { className: 'sechead' }, [
+    el('div', {}, [
+      el('h2', { textContent: 'The ten loudest senders' }),
+      el('p', { className: 'sub', style: 'margin:0',
+        textContent: 'Click a row to see what it actually sends you.' }),
+    ]),
+    el('button', { className: 'btn link', textContent: `All ${num(s.senders)} senders →`,
+      onclick: () => go('senders') }),
+  ]));
+  sec2.append(senderTable(d.top_senders, { selectable: S.actions }));
+  main.append(sec2);
+};
+
+const FILTERS = {
+  All: () => true,
+  Noisy: (r) => (r.per_week || 0) >= 5,
+  'Never opened': (r) => r.emails > 0 && (r.unread || 0) / r.emails > 0.9,
+  'Mostly protected': (r) => r.emails > 0 && (r.protected || 0) / r.emails > 0.5,
+};
+
+VIEWS.senders = async (main) => {
+  const d = await api('senders?limit=500');
+  S.senders = d.rows;
+  const total = S.overview ? S.overview.stats.senders : d.rows.length;
+
+  main.append(el('h1', { textContent: 'Senders' }));
+  main.append(el('p', { className: 'lede', textContent:
+    `${num(total)} senders. Sorted by volume.` }));
+
+  const q = S.query.trim().toLowerCase();
+  const visible = d.rows.filter((r) =>
+    (!q || (r.key || '').toLowerCase().includes(q)) && FILTERS[S.filter](r));
+
+  const bar = el('div', { className: 'toolbar' });
+  const input = el('input', { value: S.query, placeholder: 'Filter by sender or domain' });
+  let debounce;
+  input.oninput = () => {
+    S.query = input.value;
+    clearTimeout(debounce);
+    debounce = setTimeout(() => go('senders', { focus: 'search' }), 160);
+  };
+  bar.append(input);
+  const chips = el('div', { className: 'chips' });
+  for (const name of Object.keys(FILTERS)) {
+    chips.append(el('button', {
+      className: 'chip' + (S.filter === name ? ' on' : ''),
+      textContent: name,
+      onclick: () => { S.filter = name; go('senders'); },
+    }));
+  }
+  bar.append(chips);
+  bar.append(el('div', { className: 'spacer' }));
+  bar.append(el('span', { className: 'headstat num',
+    textContent: `${num(visible.length)} of ${num(total)} shown` }));
+  main.append(bar);
+
+  main.append(senderTable(visible, {
+    selectable: S.actions, max: Math.max(1, ...d.rows.map((r) => r.emails || 0)) }));
+
+  if (!S.actions) {
+    const n = el('div', { className: 'notice' });
+    n.append(el('span', { textContent:
+      'Read-only. Turn on actions to select senders and clean them up.' }));
+    n.append(el('button', { className: 'btn link', textContent: 'How',
+      onclick: needActions }));
+    main.append(n);
+  }
+};
+
+VIEWS.cleanup = async (main) => {
+  const d = await api('suggestions');
+  main.append(el('h1', { textContent: 'Cleanup' }));
+  main.append(el('p', { className: 'lede', style: 'max-width:560px', textContent:
+    `${d.rows.length} batches, ordered by how much they free. Every batch excludes ` +
+    'protected mail — nothing here touches anything you have read or replied to.' }));
+
+  const rows = d.rows.slice().sort((a, b) => (b.bytes || 0) - (a.bytes || 0));
+  const batches = el('div', { className: 'batches' });
+  for (const r of rows) {
+    batches.append(el('div', { className: 'batch' }, [
+      el('div', { style: 'flex:1; min-width:220px' }, [
+        el('div', { className: 'title', textContent: r.key }),
+        el('div', { className: 'detail', textContent: r.desc }),
+      ]),
+      el('div', { style: 'text-align:right; flex:none; width:96px' }, [
+        el('div', { className: 'big num', textContent: num(r.emails) }),
+        el('div', { className: 'cap', textContent: 'messages' }),
+      ]),
+      el('div', { style: 'text-align:right; flex:none; width:88px' }, [
+        el('div', { className: 'big num', style: 'color:var(--accent)',
+          textContent: size(r.bytes) }),
+        el('div', { className: 'cap', textContent: 'freed' }),
+      ]),
+      el('div', { style: 'flex:none; width:130px; display:flex; justify-content:flex-end' },
+        el('button', {
+          className: 'btn' + (S.actions ? ' primary' : ''),
+          textContent: S.actions ? 'Clean up' : 'Preview',
+          onclick: () => openPreview({ kind: 'suggestion', value: r.index }, 'trash'),
+        })),
+    ]));
+  }
+  main.append(batches);
+
+  const prot = S.overview ? S.overview.stats.protected : 0;
+  main.append(el('div', { className: 'safe' }, [
+    el('span', { className: 'swatch' }),
+    el('div', { className: 'txt' }, [
+      el('strong', { textContent: `${num(prot)} messages stay put.` }),
+      ' Anything you opened, replied to, starred, or flagged as important is ' +
+      'protected and never included in a batch.',
+    ]),
+  ]));
+};
+
+VIEWS.attention = async (main) => {
+  const d = await api('attention?limit=300');
+  main.append(el('h1', { textContent: 'Needs attention' }));
+  main.append(el('p', { className: 'lede',
+    textContent: 'Unread mail the classifier thinks you actually care about.' }));
+  main.append(plainTable([
+    { key: 'attention', label: 'Attention', w: '150px' },
+    { key: 'from_email', label: 'From', w: 'minmax(160px,1fr)' },
+    { key: 'subject', label: 'Subject', w: 'minmax(220px,2fr)',
+      fmt: (r) => r.subject || '(no subject)' },
+    { key: 'category', label: 'Category', w: '110px' },
+    { key: 'received_at', label: 'When', w: '80px', r: true, fmt: (r) => ago(r.received_at) },
+  ], d.rows));
+};
+
+VIEWS.domains = async (main) => {
+  const d = await api('domains?limit=500');
+  main.append(el('h1', { textContent: 'Domains' }));
+  main.append(el('p', { className: 'lede', textContent: 'Rolled up by sending domain.' }));
+  main.append(plainTable([
+    { key: 'key', label: 'Domain', w: 'minmax(200px,1fr)' },
+    { key: 'emails', label: 'Emails', w: '80px', r: true, fmt: (r) => num(r.emails) },
+    { key: 'unread', label: 'Unread', w: '80px', r: true, fmt: (r) => num(r.unread) },
+    { key: 'per_week', label: '/Week', w: '70px', r: true, fmt: (r) => (r.per_week || 0).toFixed(1) },
+    { key: 'bytes', label: 'Size', w: '86px', r: true, fmt: (r) => size(r.bytes) },
+    { key: 'last_seen', label: 'Last', w: '70px', r: true, fmt: (r) => ago(r.last_seen) },
+    { key: 'protected', label: 'Protected', w: '92px', r: true, fmt: (r) => num(r.protected),
+      cls: (r) => (r.protected ? 'prot1' : 'prot0') },
+  ], d.rows, (r) => openPreview({ kind: 'domain', value: r.key }, 'archive')));
+};
+
+VIEWS.categories = async (main) => {
+  const d = await api('categories');
+  main.append(el('h1', { textContent: 'Categories' }));
+  main.append(el('p', { className: 'lede', textContent: 'What the classifier made of your mail.' }));
+  main.append(plainTable([
+    { key: 'key', label: 'Category', w: 'minmax(160px,1fr)' },
+    { key: 'emails', label: 'Emails', w: '90px', r: true, fmt: (r) => num(r.emails) },
+    { key: 'unread', label: 'Unread', w: '90px', r: true, fmt: (r) => num(r.unread) },
+    { key: 'bytes', label: 'Size', w: '90px', r: true, fmt: (r) => size(r.bytes) },
+    { key: 'protected', label: 'Protected', w: '96px', r: true, fmt: (r) => num(r.protected),
+      cls: (r) => (r.protected ? 'prot1' : 'prot0') },
+    { key: 'last_seen', label: 'Last', w: '80px', r: true, fmt: (r) => ago(r.last_seen) },
+  ], d.rows, (r) => openPreview({ kind: 'category', value: r.key }, 'archive')));
+};
+
+VIEWS.ages = async (main) => {
+  const d = await api('ages');
+  d.rows.forEach((r, i) => (r.index = i));
+  main.append(el('h1', { textContent: 'Age' }));
+  main.append(el('p', { className: 'lede',
+    textContent: 'Click a bucket to preview a bulk action on everything that old.' }));
+  main.append(plainTable([
+    { key: 'key', label: 'Age', w: 'minmax(160px,1fr)' },
+    { key: 'emails', label: 'Emails', w: '90px', r: true, fmt: (r) => num(r.emails) },
+    { key: 'unread', label: 'Unread', w: '90px', r: true, fmt: (r) => num(r.unread) },
+    { key: 'bytes', label: 'Size', w: '90px', r: true, fmt: (r) => size(r.bytes) },
+    { key: 'protected', label: 'Protected', w: '96px', r: true, fmt: (r) => num(r.protected),
+      cls: (r) => (r.protected ? 'prot1' : 'prot0') },
+  ], d.rows, (r) => openPreview({ kind: 'age', value: r.index }, 'archive')));
+};
+
+VIEWS.history = async (main) => {
+  const d = await api('history?limit=100');
+  main.append(el('h1', { textContent: 'History' }));
+  main.append(el('p', { className: 'lede',
+    textContent: 'Every batch this tool ran. Click one to put it back.' }));
+  main.append(plainTable([
+    { key: 'ts', label: 'When', w: 'minmax(170px,1fr)', fmt: (r) => when(r.ts) },
+    { key: 'action', label: 'Action', w: '110px' },
+    { key: 'detail', label: 'Detail', w: 'minmax(160px,1fr)' },
+    { key: 'n', label: 'Messages', w: '96px', r: true, fmt: (r) => num(r.n) },
+    { key: 'undone', label: 'Status', w: '90px', fmt: (r) => (r.undone ? 'undone' : 'applied') },
+  ], d.rows, async (r) => {
+    if (r.undone) return toast('Already undone.');
+    try {
+      const res = await api('undo', { batch_id: r.batch_id });
+      toast(`Restored ${num(res.undone)} messages.`);
+      S.overview = null;
+      await refreshHeader();
+      go('history');
+    } catch (e) { toast(e.message, true); }
+  }));
+};
+
+/* ---------- nav ---------- */
+const NAV = [
+  ['overview', 'Overview'], ['senders', 'Senders'], ['cleanup', 'Cleanup'],
+  null,
+  ['attention', 'Attention'], ['domains', 'Domains'], ['categories', 'Categories'],
+  ['ages', 'Age'], ['history', 'History'],
+];
+
+function drawNav() {
+  const nav = $('#nav');
+  nav.textContent = '';
+  for (const item of NAV) {
+    if (!item) { nav.append(el('div', { className: 'rule' })); continue; }
+    const [k, label] = item;
+    nav.append(el('button', {
+      className: S.tab === k ? 'on' : '', textContent: label, onclick: () => go(k),
+    }));
+  }
+  nav.append(el('div', { className: 'rule' }));
+  const prot = S.overview ? S.overview.stats.protected : 0;
+  nav.append(el('div', { className: 'note' }, [
+    el('div', { className: 'row' }, [
+      el('span', { className: 'swatch' }),
+      el('span', { className: 'num', textContent: `${num(prot)} protected` }),
+    ]),
+    el('div', { textContent: 'Never touched by any action.' }),
+  ]));
+}
+
+/* ---------- shell ---------- */
+async function go(tab, opts = {}) {
+  S.tab = tab;
+  drawNav();
+  const main = $('#main');
+  main.textContent = '';
+  main.append(el('p', { className: 'lede', textContent: 'Loading…' }));
+  const fresh = el('main', { id: 'main' });
+  try {
+    await VIEWS[tab](fresh);
+    main.replaceWith(fresh);
+  } catch (e) {
+    main.textContent = '';
+    main.append(el('p', { className: 'err', textContent: e.message }));
+  }
+  drawSelectionBar();
+  if (opts.focus === 'search') {
+    const i = document.querySelector('.toolbar input');
+    if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+  }
+}
+
+function drawMode() {
+  $('#seg-ro').className = S.actions ? '' : 'on';
+  $('#seg-on').className = S.actions ? 'on' : '';
+}
+
+$('#seg-ro').onclick = () => {
+  if (!S.actions) return;
+  toast('Actions stay on until you run `gclean disable-actions` in the terminal.');
+};
+$('#seg-on').onclick = () => { if (!S.actions) needActions(); };
+
+async function refreshHeader() {
+  try {
+    const d = await api('overview');
+    S.overview = d;
+    S.actions = !!d.actions_enabled;
+    if (!S.actions) S.selected.clear();
+    $('#account').textContent = d.account || '(not configured)';
+    $('#headstat').textContent =
+      `${num(d.stats.total)} messages · synced ${ago(d.last_sync)} · ` +
+      `${d.sync_days}d window`;
+    drawMode();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function pollSync() {
+  const btn = $('#btn-sync');
+  const tick = async () => {
+    const s = await api('sync/status', {});
+    if (s.error) toast(s.error, true);
+    else if (s.message) $('#headstat').textContent = s.message;
+    if (s.running) return setTimeout(tick, 700);
+    btn.disabled = false;
+    btn.textContent = 'Sync';
+    S.overview = null;
+    await refreshHeader();
+    go(S.tab);
+  };
+  tick();
+}
+
+$('#btn-sync').onclick = async () => {
+  const btn = $('#btn-sync');
+  btn.disabled = true;
+  btn.textContent = 'Syncing…';
+  try { await api('sync', {}); pollSync(); }
+  catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Sync'; }
+};
+
+refreshHeader().then(() => go('overview'));
+</script>

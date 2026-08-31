@@ -52,7 +52,8 @@ or use `uv run gclean`).
 ```bash
 gclean setup            # paste your Gmail address + app password
 gclean sync             # index the last 365 days (metadata only)
-gclean                  # open the dashboard
+gclean                  # open the terminal dashboard
+gclean gui              # ...or the browser one
 ```
 
 Widen the window when you want the old junk:
@@ -70,6 +71,29 @@ To allow archive / trash / label / mark-read:
 ```bash
 gclean enable-actions
 ```
+
+## The browser GUI
+
+```bash
+gclean gui              # opens http://127.0.0.1:8765 in your browser
+gclean gui --port 9000 --no-browser
+```
+
+Same index, same queries, same guard rails as the terminal dashboard — just
+easier to read. Click any sender, domain, category, age band or cleanup
+suggestion to get the preview, and act from there. History undoes a batch with
+one click.
+
+It is a local page, not a service:
+
+- Bound to `127.0.0.1` only, and it stops when you press Ctrl-C.
+- A one-time token in the launch URL is required on every request, so no other
+  page in your browser can drive it.
+- The page never sends SQL. It names a target (`sender`, `domain`, `category`,
+  `suggestion`, ...) and the server builds the query, so the browser cannot
+  widen a selection beyond what the UI offers.
+- Actions still need `gclean enable-actions`, still skip protected mail, still
+  show the preview first, and still cannot permanently delete anything.
 
 ## The dashboard
 
@@ -122,13 +146,17 @@ gmail_cleaner/
   classify.py     the deterministic classifier
   stats.py        every query behind every screen
   actions.py      archive/trash/label/mark-read + preview + audit log + undo
-  tui.py          the dashboard
+  tui.py          the terminal dashboard
+  web.py          local HTTP server behind `gclean gui`
+  static/         the one-page browser GUI
   cli.py          gclean
 tests/
   make_fixture.py synthetic mailbox
   test_smoke.py   headless run of every screen + fake-IMAP action round trip
+  test_web.py     the GUI's HTTP surface, token/host guards, target validation
 ```
 
 ```bash
 .venv/bin/python tests/test_smoke.py
+.venv/bin/python tests/test_web.py
 ```

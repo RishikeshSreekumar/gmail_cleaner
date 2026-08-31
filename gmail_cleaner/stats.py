@@ -26,9 +26,13 @@ def overview(conn: sqlite3.Connection) -> dict:
            FROM emails"""
     ).fetchone()
     d = dict(row)
-    d["cleanup"] = conn.execute(
-        "SELECT COUNT(*) c FROM emails WHERE retention='cleanup candidate' AND protected=0"
-    ).fetchone()["c"]
+    pool = conn.execute(
+        "SELECT COUNT(*) c, SUM(size) b, COUNT(DISTINCT from_email) s FROM emails "
+        "WHERE retention='cleanup candidate' AND protected=0"
+    ).fetchone()
+    d["cleanup"] = pool["c"]
+    d["cleanup_bytes"] = pool["b"] or 0
+    d["cleanup_senders"] = pool["s"]
     d["attention"] = conn.execute(
         "SELECT COUNT(*) c FROM emails "
         "WHERE attention IN ('action required','potentially important') AND is_unread=1"
@@ -89,6 +93,13 @@ def domains(conn, limit=200, order="emails") -> list[dict]:
 def senders(conn, limit=200, order="emails", domain: str | None = None) -> list[dict]:
     extra = "AND from_domain = ?" if domain else ""
     return _grouped(conn, "from_email", limit, order, extra, (domain,) if domain else ())
+
+
+def sender(conn, email: str) -> dict | None:
+    """The same grouped row the sender table shows, for exactly one address."""
+    rows = _grouped(conn, "from_email", 1, "emails",
+                    "AND from_email = ?", (email.lower(),))
+    return rows[0] if rows else None
 
 
 def categories(conn) -> list[dict]:

@@ -19,3 +19,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["gmail_cleaner"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"gmail_cleaner/static" = "gmail_cleaner/static"

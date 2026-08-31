@@ -116,6 +116,23 @@ def ui() -> None:
     run_app(conn, cfg)
 
 
+@app.command()
+def gui(
+    port: int = typer.Option(8765, "--port", "-p", help="Port on 127.0.0.1."),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Do not open a browser."),
+    verbose: bool = typer.Option(False, "--verbose", help="Log every request."),
+) -> None:
+    """Open the browser dashboard (local only, same safety rules as the TUI)."""
+    cfg = Config.load()
+    if not cfg.email:
+        console.print("[yellow]Not configured yet.[/yellow] Run: gclean setup")
+        raise typer.Exit(1)
+    db.connect().close()
+    from .web import serve
+
+    serve(port=port, open_browser=not no_browser, verbose=verbose)
+
+
 @app.command("enable-actions")
 def enable_actions() -> None:
     """Allow archive / trash / label / mark-read. Off by default."""
