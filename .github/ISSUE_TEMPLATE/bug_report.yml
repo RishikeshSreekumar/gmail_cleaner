@@ -1,0 +1,49 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please redact real addresses and subject lines. For anything
+        security-sensitive, use [SECURITY.md](../blob/main/SECURITY.md) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got.
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: mclean sync --days 365
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      options:
+        - Gmail
+        - Outlook.com / Microsoft 365
+        - Proton Mail (Bridge)
+        - Fastmail
+        - iCloud
+        - Yahoo
+        - Zoho
+        - Other IMAP
+        - Not provider-specific
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: OS and Python version
+      placeholder: macOS 15.5, Python 3.13
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output or traceback
+      render: text

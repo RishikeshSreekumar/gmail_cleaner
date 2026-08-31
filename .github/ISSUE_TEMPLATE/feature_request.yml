@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest an improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to find out about, or clean up?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+  - type: checkboxes
+    id: invariants
+    attributes:
+      label: Safety
+      options:
+        - label: This keeps the project's invariants (no permanent delete, metadata only, offline classification, no telemetry) — see CONTRIBUTING.md
+          required: true
