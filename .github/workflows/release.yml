@@ -51,7 +51,7 @@ jobs:
           - runner: ubuntu-22.04-arm
             os_name: linux
             arch: arm64
-          - runner: macos-13
+          - runner: macos-15-intel
             os_name: macos
             arch: x86_64
           - runner: macos-14
