@@ -29,9 +29,11 @@ mclean sync     # build the local metadata index
 mclean          # open the dashboard  (or: mclean gui)
 ```
 
-If macOS refuses to open a binary you downloaded through the browser, clear the
-quarantine flag: `xattr -d com.apple.quarantine ./mclean`. The installer script
-is not affected.
+The macOS binaries are signed with a Developer ID certificate and notarized by
+Apple, so a browser download opens without a Gatekeeper warning -- the first run
+checks the notarization ticket online. If you are offline and macOS refuses to
+open it, `xattr -d com.apple.quarantine ./mclean` clears the quarantine flag.
+The installer script never sets that flag, so it is unaffected either way.
 
 ## Verifying a download
 

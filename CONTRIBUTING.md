@@ -92,6 +92,45 @@ then publishes them all on the GitHub release with a `checksums.txt` that the
 installer scripts verify. To test a build without tagging, run the workflow
 manually from the Actions tab.
 
+### Signing the macOS builds
+
+The macOS binaries are signed with a Developer ID certificate and notarized by
+Apple, so people who download them through a browser are not told the app is
+from an unidentified developer. Both steps are skipped when the secrets below
+are missing, and the build falls back to an ad-hoc signature -- so a fork with
+no Apple Developer account still produces a working release.
+
+Notarization needs a paid Apple Developer Program membership. Set these as
+repository secrets (Settings -> Secrets and variables -> Actions):
+
+| Secret | What it is |
+|---|---|
+| `MACOS_CERTIFICATE` | Base64 of your *Developer ID Application* certificate exported as a `.p12` |
+| `MACOS_CERTIFICATE_PASSWORD` | The password you set when exporting that `.p12` |
+| `APPLE_API_KEY` | Base64 of an App Store Connect API key (`.p8`) |
+| `APPLE_API_KEY_ID` | That key's Key ID |
+| `APPLE_API_ISSUER_ID` | The issuer ID shown above the key list |
+
+To produce them:
+
+1. In Xcode (Settings -> Accounts -> Manage Certificates) or on
+   [developer.apple.com](https://developer.apple.com/account/resources/certificates),
+   create a **Developer ID Application** certificate.
+2. In Keychain Access, export it *with its private key* as `certificate.p12`,
+   then `base64 -i certificate.p12 | pbcopy` for `MACOS_CERTIFICATE`.
+3. At [App Store Connect -> Users and Access -> Integrations -> Keys](https://appstoreconnect.apple.com/access/integrations/api),
+   create a key with the **Developer** role. Download the `.p8` once, then
+   `base64 -i AuthKey_XXXX.p8 | pbcopy` for `APPLE_API_KEY`.
+
+The identity itself is not a secret: the workflow reads it back out of the
+imported certificate. The certificate lives in a throwaway keychain that is
+deleted when the job ends, whether or not it succeeded.
+
+A bare executable cannot be stapled -- `stapler` only accepts bundles, disk
+images and installer packages -- so Gatekeeper resolves the notarization ticket
+online the first time someone runs a browser-downloaded binary. Nothing is
+needed for the `install.sh` path, which never sets the quarantine flag.
+
 ## Reporting bugs
 
 Open an issue with your OS, Python version, provider, and the command you ran.

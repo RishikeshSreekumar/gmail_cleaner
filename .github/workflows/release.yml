@@ -41,6 +41,18 @@ jobs:
   binaries:
     name: mclean (${{ matrix.os_name }}-${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
+    env:
+      # The macOS builds are signed and notarized when these are configured,
+      # and fall back to an ad-hoc signature when they are not -- so forks and
+      # anyone without an Apple Developer account still get a working release.
+      # See CONTRIBUTING.md for how to produce each one.
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+      CAN_SIGN: ${{ secrets.MACOS_CERTIFICATE != '' && secrets.MACOS_CERTIFICATE_PASSWORD != '' }}
+      CAN_NOTARIZE: ${{ secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER_ID != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -71,6 +83,32 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install . pyinstaller
+      # The certificate lives in a throwaway keychain for the life of the job,
+      # and the identity is read back out of it rather than kept as a secret of
+      # its own. The spec picks MACOS_CODESIGN_IDENTITY up from the environment.
+      - name: Import signing certificate
+        if: matrix.os_name == 'macos' && env.CAN_SIGN == 'true'
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password=$(openssl rand -base64 24)
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
+          security list-keychain -d user -s "$keychain" login.keychain-db
+          identity=$(security find-identity -v -p codesigning "$keychain" \
+            | grep "Developer ID Application" | head -n 1 | sed -n 's/.*"\(.*\)"/\1/p')
+          if [ -z "$identity" ]; then
+            echo "::error::no Developer ID Application identity in MACOS_CERTIFICATE"
+            exit 1
+          fi
+          echo "Signing as: $identity"
+          echo "MACOS_CODESIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+
       - name: Build binary
         working-directory: packaging
         run: pyinstaller --clean --noconfirm mclean.spec
@@ -78,6 +116,52 @@ jobs:
         working-directory: packaging
         shell: bash
         run: ./dist/mclean providers
+
+      - name: Verify signature
+        if: matrix.os_name == 'macos' && env.CAN_SIGN == 'true'
+        working-directory: packaging
+        run: |
+          codesign --verify --strict --verbose=2 dist/mclean
+          codesign --display --verbose=4 dist/mclean 2>&1 | grep -E "Authority|TeamIdentifier|flags"
+
+      # Notarization takes a zip only as transport; the ticket is issued against
+      # the binary's code-directory hash, so the copy inside the published
+      # tar.gz is the notarized one. A bare Mach-O cannot be stapled -- only
+      # bundles, disk images and installer packages can -- so Gatekeeper looks
+      # the ticket up online the first time someone runs it.
+      - name: Notarize
+        if: matrix.os_name == 'macos' && env.CAN_SIGN == 'true' && env.CAN_NOTARIZE == 'true'
+        working-directory: packaging
+        run: |
+          ditto -c -k dist/mclean "$RUNNER_TEMP/notarize.zip"
+          echo "$APPLE_API_KEY" | base64 --decode > "$RUNNER_TEMP/api-key.p8"
+          set +e
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --key "$RUNNER_TEMP/api-key.p8" \
+            --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER_ID" \
+            --wait --timeout 30m --output-format json > "$RUNNER_TEMP/notarize.json"
+          submit_status=$?
+          set -e
+          cat "$RUNNER_TEMP/notarize.json"
+          id=$(jq -r '.id // empty' "$RUNNER_TEMP/notarize.json")
+          status=$(jq -r '.status // empty' "$RUNNER_TEMP/notarize.json")
+          if [ "$status" != "Accepted" ] || [ "$submit_status" -ne 0 ]; then
+            echo "::error::notarization did not succeed (status: ${status:-unknown})"
+            [ -n "$id" ] && xcrun notarytool log "$id" \
+              --key "$RUNNER_TEMP/api-key.p8" --key-id "$APPLE_API_KEY_ID" \
+              --issuer "$APPLE_API_ISSUER_ID" || true
+            rm -f "$RUNNER_TEMP/api-key.p8"
+            exit 1
+          fi
+          rm -f "$RUNNER_TEMP/api-key.p8"
+
+      - name: Remove signing keychain
+        if: always() && matrix.os_name == 'macos' && env.CAN_SIGN == 'true'
+        run: |
+          security list-keychain -d user -s login.keychain-db
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/api-key.p8"
 
       # Older glibc than the build host would reject the binary, so the Linux
       # builds run on the oldest supported runner rather than being patched.
