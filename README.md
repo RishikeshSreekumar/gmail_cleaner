@@ -3,6 +3,7 @@
 [![CI](https://github.com/RishikeshSreekumar/gmail_cleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/RishikeshSreekumar/gmail_cleaner/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![Latest release](https://img.shields.io/github/v/release/RishikeshSreekumar/gmail_cleaner?label=download)](https://github.com/RishikeshSreekumar/gmail_cleaner/releases/latest)
 
 A local mailbox observability + cleanup dashboard. It builds a **metadata-only**
 SQLite index of your mail, shows you who is actually filling it up, and lets you
@@ -80,13 +81,52 @@ verification is relaxed for Proton accounts only.
 
 ## Install
 
+**macOS / Linux**
+
 ```bash
+curl -fsSL https://raw.githubusercontent.com/RishikeshSreekumar/gmail_cleaner/main/install.sh | sh
+```
+
+**Windows** (PowerShell)
+
+```powershell
+irm https://raw.githubusercontent.com/RishikeshSreekumar/gmail_cleaner/main/install.ps1 | iex
+```
+
+The installer downloads the standalone `mclean` for your machine from the
+[latest release](https://github.com/RishikeshSreekumar/gmail_cleaner/releases/latest),
+checks its SHA-256, and puts it in `~/.local/bin`. There is nothing to
+configure and no Python to install — the build bundles its own interpreter.
+Uninstalling is `rm ~/.local/bin/mclean` plus `rm -rf ~/.mailcleaner` for the
+local indexes.
+
+<details>
+<summary>Other ways to install</summary>
+
+**A binary, by hand.** Every release publishes one per platform. Download,
+unpack, `chmod +x mclean`, move it somewhere on your PATH.
+
+**With pipx or uv**, if you already have Python 3.11+:
+
+```bash
+pipx install https://github.com/RishikeshSreekumar/gmail_cleaner/releases/latest/download/mailcleaner-0.1.0-py3-none-any.whl
+```
+
+**From source:**
+
+```bash
+git clone https://github.com/RishikeshSreekumar/gmail_cleaner
+cd gmail_cleaner
 uv venv --python 3.13
 uv pip install -e .
 ```
 
 The `mclean` command lands in `.venv/bin/mclean` (add `.venv/bin` to your PATH,
-or use `uv run mclean`). `gclean` still works as an alias.
+or use `uv run mclean`).
+
+</details>
+
+`gclean` still works as an alias for `mclean` everywhere.
 
 ## Use
 

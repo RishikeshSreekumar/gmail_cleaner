@@ -76,6 +76,22 @@ including exactly what the user is granting and how they revoke it.
 - Never include real mail, addresses, tokens or app passwords in code, tests,
   fixtures, screenshots or issue reports.
 
+## Releasing
+
+Releases are tag-driven. Bump `version` in `pyproject.toml` and `__version__`
+in `mailcleaner/__init__.py`, move the `Unreleased` entries into a new section
+of `CHANGELOG.md`, then:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+`.github/workflows/release.yml` builds the wheel, the sdist and a standalone
+`mclean` for Linux, macOS and Windows (PyInstaller, `packaging/mclean.spec`),
+then publishes them all on the GitHub release with a `checksums.txt` that the
+installer scripts verify. To test a build without tagging, run the workflow
+manually from the Actions tab.
+
 ## Reporting bugs
 
 Open an issue with your OS, Python version, provider, and the command you ran.
