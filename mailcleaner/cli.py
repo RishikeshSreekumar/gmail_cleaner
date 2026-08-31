@@ -56,9 +56,9 @@ def _open(account: Account):
 
 
 @app.callback()
-def main(ctx: typer.Context) -> None:
+def main(ctx: typer.Context, account_id: str | None = ACCOUNT_OPT) -> None:
     if ctx.invoked_subcommand is None:
-        ui()
+        ui(account_id)
 
 
 @app.command("providers")
@@ -259,7 +259,7 @@ def remove_account(
 
 
 @app.command("login")
-def login(account_id: str = ACCOUNT_OPT) -> None:
+def login(account_id: str | None = ACCOUNT_OPT) -> None:
     """Re-enter the password, or redo the browser sign-in, for an account."""
     store = _store()
     account = _pick(store, account_id)
@@ -277,7 +277,7 @@ def login(account_id: str = ACCOUNT_OPT) -> None:
 
 
 @app.command()
-def logout(account_id: str = ACCOUNT_OPT) -> None:
+def logout(account_id: str | None = ACCOUNT_OPT) -> None:
     """Forget an account's credential. The index stays."""
     store = _store()
     account = _pick(store, account_id)
@@ -292,7 +292,7 @@ def logout(account_id: str = ACCOUNT_OPT) -> None:
 
 @app.command("sync")
 def sync_cmd(
-    account_id: str = ACCOUNT_OPT,
+    account_id: str | None = ACCOUNT_OPT,
     all_accounts: bool = typer.Option(False, "--all", help="Sync every account."),
     days: int = typer.Option(None, "--days", "-d", help="How far back to index."),
     full: bool = typer.Option(False, "--full", help="Re-fetch everything in the window."),
@@ -335,7 +335,7 @@ def _sync_one(store: Store, account: Account, days: int | None, full: bool) -> N
 
 
 @app.command()
-def ui(account_id: str = ACCOUNT_OPT) -> None:
+def ui(account_id: str | None = ACCOUNT_OPT) -> None:
     """Open the terminal dashboard (default)."""
     store = _store()
     account = _pick(store, account_id)
@@ -346,7 +346,7 @@ def ui(account_id: str = ACCOUNT_OPT) -> None:
 
 @app.command()
 def gui(
-    account_id: str = ACCOUNT_OPT,
+    account_id: str | None = ACCOUNT_OPT,
     port: int = typer.Option(8765, "--port", "-p", help="Port on 127.0.0.1."),
     no_browser: bool = typer.Option(False, "--no-browser", help="Do not open a browser."),
     verbose: bool = typer.Option(False, "--verbose", help="Log every request."),
@@ -363,7 +363,7 @@ def gui(
 
 
 @app.command("enable-actions")
-def enable_actions(account_id: str = ACCOUNT_OPT) -> None:
+def enable_actions(account_id: str | None = ACCOUNT_OPT) -> None:
     """Allow archive / trash / label / mark-read for one account. Off by default."""
     store = _store()
     account = _pick(store, account_id)
@@ -379,7 +379,7 @@ def enable_actions(account_id: str = ACCOUNT_OPT) -> None:
 
 
 @app.command("disable-actions")
-def disable_actions(account_id: str = ACCOUNT_OPT) -> None:
+def disable_actions(account_id: str | None = ACCOUNT_OPT) -> None:
     """Go back to read-only for one account."""
     store = _store()
     account = _pick(store, account_id)
@@ -389,7 +389,7 @@ def disable_actions(account_id: str = ACCOUNT_OPT) -> None:
 
 
 @app.command()
-def status(account_id: str = ACCOUNT_OPT) -> None:
+def status(account_id: str | None = ACCOUNT_OPT) -> None:
     """Show what is indexed for an account."""
     store = _store()
     account = _pick(store, account_id)
@@ -419,7 +419,7 @@ def status(account_id: str = ACCOUNT_OPT) -> None:
 
 @app.command()
 def top(
-    account_id: str = ACCOUNT_OPT,
+    account_id: str | None = ACCOUNT_OPT,
     by: str = typer.Option("domain", help="domain | sender | category"),
     limit: int = typer.Option(20, "-n"),
 ) -> None:
@@ -447,7 +447,7 @@ def top(
 
 
 @app.command()
-def reclassify(account_id: str = ACCOUNT_OPT) -> None:
+def reclassify(account_id: str | None = ACCOUNT_OPT) -> None:
     """Re-run the classifier over the index (after editing rules)."""
     store = _store()
     account = _pick(store, account_id)
