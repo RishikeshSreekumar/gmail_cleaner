@@ -3,6 +3,7 @@
 # Textual ships .tcss stylesheets and keyring resolves its backends by entry
 # point, so both need collecting explicitly -- a plain module scan misses them.
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
@@ -17,9 +18,20 @@ entitlements_file = "entitlements.plist" if codesign_identity else None
 
 datas = [("../mailcleaner/static", "mailcleaner/static")]
 binaries = []
-hiddenimports = collect_submodules("keyring.backends")
+# Several commands import their module lazily (llm, mcp_server, schedule, ...),
+# so take the whole package rather than trust the import scan.
+hiddenimports = collect_submodules("keyring.backends") + collect_submodules("mailcleaner")
 
-for package in ("textual", "rich", "typer", "keyring"):
+packages = ["textual", "rich", "typer", "keyring"]
+try:
+    # The optional Anthropic SDK, so the binary can use `mclean llm setup -p
+    # anthropic`. Built without it, that provider explains how to add it.
+    import anthropic  # noqa: F401
+    packages.append("anthropic")
+except ImportError:
+    pass
+
+for package in packages:
     pkg_datas, pkg_binaries, pkg_hidden = collect_all(package)
     datas += pkg_datas
     binaries += pkg_binaries
@@ -50,4 +62,7 @@ exe = EXE(
     console=True,
     codesign_identity=codesign_identity,
     entitlements_file=entitlements_file,
+    # The brand icon on the Windows .exe. A bare macOS / Linux executable has
+    # no icon slot, so it is left off there.
+    icon="../assets/brand/mailcleaner.ico" if sys.platform == "win32" else None,
 )

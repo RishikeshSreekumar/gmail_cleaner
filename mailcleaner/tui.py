@@ -23,7 +23,7 @@ from textual.widgets import (
 )
 
 from . import accounts as acct_mod
-from . import actions, db, providers, stats, sync
+from . import actions, db, llm, policies, providers, stats, sync, unsubscribe
 from .accounts import Account, Store
 from .providers import MailError
 
@@ -39,6 +39,8 @@ NAV = [
     ("storage", "Storage"),
     ("cleanup", "Cleanup"),
     ("rules", "Rules"),
+    ("unsubscribe", "Unsubscribe"),
+    ("suggestions", "Suggestions"),
     ("history", "History"),
 ]
 
@@ -178,6 +180,10 @@ class CleanerApp(App):
         Binding("o", "open_web", "Open in webmail"),
         Binding("A", "next_account", "Next account", show=False),
         Binding("d", "delete_rule", "Delete rule", show=False),
+        Binding("U", "unsubscribe", "Unsubscribe", show=False),
+        Binding("y", "decide(True)", "Accept suggestion", show=False),
+        Binding("n", "decide(False)", "Reject suggestion", show=False),
+        Binding("g", "toggle_auto", "Toggle auto", show=False),
     ]
 
     def __init__(self, store: Store, account: Account):
@@ -287,8 +293,11 @@ class CleanerApp(App):
             self.push(Pane("senders", f"Domains / {meta['key']}",
                            meta["where"], meta["params"],
                            {"domain": meta["key"]}))
+        elif kind == "rules" and meta.get("policy_id"):
+            self.push(Pane("messages", f"Rules / {meta['key']}",
+                           meta["where"], meta["params"]))
         elif kind in ("senders", "categories", "frequency", "ages", "storage",
-                      "cleanup"):
+                      "cleanup", "unsubscribe", "suggestions"):
             self.push(Pane("messages", f"{self.pane.title} / {meta['key']}",
                            meta["where"], meta["params"]))
         elif kind in ("messages", "attention"):
@@ -358,6 +367,16 @@ class CleanerApp(App):
         for c in cats[:10]:
             lines.append(f"  {(c['key'] or 'unknown')[:22]:<24}{c['emails']:>7}"
                          f"{c['unread'] or 0:>8} unread")
+        alerts = stats.alerts(self.conn, 5)
+        if alerts:
+            lines.append("")
+            lines.append("[b]Getting louder[/b]")
+            for a in alerts:
+                lines.append(f"  {a['key'][:40]:<42}{a['why']}")
+        pending = len(llm.suggestions(self.conn))
+        if pending:
+            lines.append("")
+            lines.append(f"  [b]{pending}[/b] rule suggestions waiting - see Suggestions")
         lines.append("")
         lines.append("[b]Suggested cleanups[/b]")
         for s in sug:
@@ -493,14 +512,50 @@ class CleanerApp(App):
                    "its own index, rules and history. Add one: mclean add")
 
     def _render_rules(self, table, pane) -> None:
-        table.add_columns("id", "Match", "Value", "Action", "Category", "Created")
-        for r in self.conn.execute("SELECT * FROM rules ORDER BY id DESC"):
+        table.add_columns("id", "Kind", "When", "Then", "Matches", "Mode")
+        for p in policies.list_all(self.conn):
+            where, params = policies.where_for(p)
+            then = p["action"] + (f" '{p['label']}'" if p["label"] else "")
             self._add(table, [
-                r["id"], r["match_type"], r["match_value"], r["action"],
-                r["category"] or "", stats.ago(r["created_at"]),
+                p["id"], "rule", f"{p['name']}: {p['summary']}"[:70], then,
+                p["matches"], "auto" if p["auto"] else "suggest",
+            ], {"key": p["name"], "where": where, "params": params,
+                "policy_id": p["id"]})
+        for r in self.conn.execute("SELECT * FROM rules ORDER BY id DESC"):
+            then = r["action"] + (f" {r['category']}" if r["category"] else "")
+            self._add(table, [
+                r["id"], "override", f"{r['match_type']} {r['match_value']}", then,
+                "", stats.ago(r["created_at"]),
             ], {"key": r["id"], "where": "1=0", "params": (), "rule_id": r["id"]})
-        self._hint("Rules override the classifier. Add them with p / i on a sender. "
-                   "d deletes.  r re-runs classification.")
+        self._hint("Enter: what a rule matches   a/m/l act on it   g auto on/off   "
+                   "d delete   Add rules: mclean rules add / p, i on a sender")
+
+    def _render_unsubscribe(self, table, pane) -> None:
+        table.add_columns("Sender", "Emails", "Unread", "Size", "How", "Done")
+        for r in unsubscribe.senders(self.conn, 400):
+            self._add(table, [
+                r["key"][:44], r["emails"], r["unread"] or 0,
+                stats.human_size(r["bytes"]), r["method"],
+                stats.ago(r["unsubscribed_at"]) if r["unsubscribed_at"] else "",
+            ], {"key": r["key"], "where": "from_email = ?", "params": (r["key"],)})
+        self._hint("U unsubscribe   Enter: their messages   a archive the backlog "
+                   "(protected mail is excluded)")
+
+    def _render_suggestions(self, table, pane) -> None:
+        table.add_columns("id", "Sender", "Suggests", "Emails", "Conf", "Why")
+        if self.account.llm_provider == "off":
+            self._hint("LLM advisor off for this account. Turn it on: "
+                       f"mclean llm setup -a {self.account.id} -p ollama")
+            return
+        for r in llm.suggestions(self.conn):
+            what = r["action"] + (f" -> {r['category']}" if r["category"] else "")
+            self._add(table, [
+                r["id"], r["match_value"][:36], what, r["emails"],
+                f"{r['confidence']:.2f}", (r["reason"] or "")[:60],
+            ], {"key": r["match_value"], "where": "from_email = ?",
+                "params": (r["match_value"],), "suggestion_id": r["id"]})
+        self._hint("y accept (becomes a rule)   n reject   Enter: their messages   "
+                   "More: mclean llm suggest")
 
     def _render_history(self, table, pane) -> None:
         table.add_columns("Batch", "Action", "Detail", "Messages", "When", "Undone")
@@ -717,10 +772,75 @@ class CleanerApp(App):
         meta = self.current_meta()
         if self.pane.kind != "rules" or not meta:
             return
-        actions.delete_rule(self.conn, meta["rule_id"])
-        sync.reclassify_all(self.conn)
+        if meta.get("policy_id"):
+            policies.remove(self.conn, meta["policy_id"])
+        else:
+            actions.delete_rule(self.conn, meta["rule_id"])
+            sync.reclassify_all(self.conn)
         self.render_pane()
         self.notify_status("rule deleted")
+
+    def action_toggle_auto(self) -> None:
+        meta = self.current_meta()
+        if self.pane.kind != "rules" or not meta or not meta.get("policy_id"):
+            return
+        p = policies.get(self.conn, meta["policy_id"])
+        policies.set_auto(self.conn, p["id"], not p["auto"])
+        self.render_pane()
+        self.notify_status(f"rule {p['id']}: {'suggest' if p['auto'] else 'auto'}")
+
+    def action_decide(self, accept: bool) -> None:
+        meta = self.current_meta()
+        if self.pane.kind != "suggestions" or not meta:
+            return
+        try:
+            r = llm.decide(self.conn, meta["suggestion_id"], accept)
+        except llm.LLMError as e:
+            self.notify_status(str(e))
+            return
+        self.render_pane()
+        self.notify_status(f"{'accepted' if accept else 'rejected'}: "
+                           f"{r['action']} {r['match_value']}")
+
+    def action_unsubscribe(self) -> None:
+        meta = self.current_meta()
+        row = meta.get("row") if meta else None
+        if self.pane.kind in ("unsubscribe", "senders", "suggestions") and meta:
+            sender = meta["key"]
+        elif row:
+            sender = row["from_email"]
+        else:
+            return
+        if not self.account.actions_enabled:
+            self.notify_status("Unsubscribing needs actions on: "
+                               f"mclean enable-actions -a {self.account.id}")
+            return
+        opt = unsubscribe.options(self.conn, sender)
+        if not opt:
+            self.notify_status(f"{sender} has not offered an unsubscribe")
+            return
+        how = {"one-click": f"one-click request to {opt['host']}",
+               "link": f"open {opt['host']} in your browser",
+               "mailto": "open an email in your mail client"}[opt["method"]]
+
+        def after(answer: str | None) -> None:
+            if (answer or "").lower() not in ("y", "yes"):
+                self.notify_status("unsubscribe cancelled")
+                return
+            try:
+                res = unsubscribe.unsubscribe(self.conn, sender)
+            except unsubscribe.UnsubscribeError as e:
+                self.notify_status(f"unsubscribe failed: {e}")
+                return
+            if res["status"] == "manual":
+                webbrowser.open(res["open"])
+                self.notify_status("opened - finish there")
+            else:
+                self.notify_status(f"unsubscribed from {sender}; a archives the backlog")
+            self.render_pane()
+
+        self.push_screen(Prompt(f"Unsubscribe from {sender} ({how})? "
+                                "Cannot be undone. Type y:"), after)
 
     def action_open_web(self) -> None:
         meta = self.current_meta() or self.pane.extra

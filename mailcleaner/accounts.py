@@ -59,6 +59,16 @@ class Account:
     sync_days: int = 365
     review_label: str = "Cleanup/Review"
     created_at: int = 0
+    #: Keyword packs the classifier uses (see classify.LOCALES). Empty means
+    #: every pack, which is what 0.1.0 did.
+    locales: list[str] = field(default_factory=list)
+    #: Optional LLM advisor: "off", "ollama" or "anthropic". Off unless the user
+    #: turns it on for this account; it only ever proposes rules.
+    llm_provider: str = "off"
+    llm_model: str = ""
+    llm_host: str = ""
+    #: Whether sample subject lines go to the model, or only sender statistics.
+    llm_share_subjects: bool = True
 
     @classmethod
     def from_provider(cls, provider_key: str, email: str, **over) -> "Account":
@@ -317,6 +327,24 @@ def get_secret(account: Account) -> AuthSecret | None:
 def clear_secret(account: Account) -> None:
     _drop_secret(account, "")
     _drop_secret(account, ".oauth")
+    _drop_secret(account, LLM_KEY_SUFFIX)
+
+
+#: The optional Anthropic API key for this account's LLM advisor. Kept apart
+#: from the mailbox credential; it is only ever sent to api.anthropic.com.
+LLM_KEY_SUFFIX = ".llm.anthropic"
+
+
+def set_llm_key(account: Account, key: str) -> str:
+    return _write_secret(account, LLM_KEY_SUFFIX, key)
+
+
+def get_llm_key(account: Account) -> str | None:
+    return _read_secret(account, LLM_KEY_SUFFIX)
+
+
+def clear_llm_key(account: Account) -> None:
+    _drop_secret(account, LLM_KEY_SUFFIX)
 
 
 def backend(account: Account):

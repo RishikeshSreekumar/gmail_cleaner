@@ -36,38 +36,167 @@ AUTOMATED_LOCALPARTS = (
 def _kw(*words: str) -> re.Pattern:
     return re.compile(r"\b(" + "|".join(words) + r")\b", re.I)
 
-FINANCE_RE = _kw(
-    "invoice", "invoices", "statement", "statements", "receipt", "receipts",
-    "transaction", "payment", "paid", "credited", "debited", "refund", "bill",
-    "billing", "tax", "gst", "tds", "salary", "payslip", "premium", "emi",
-    "mutual fund", "portfolio", "dividend", "settlement",
-)
-SECURITY_RE = _kw(
-    "otp", "one-time", "verification", "verify", "sign-in", "sign in", "signin",
-    "login", "log in", "password", "2fa", "two-factor", "security alert",
-    "suspicious", "unauthorized", "authenticate", "passcode", "recovery",
-)
-ORDER_RE = _kw(
-    "order", "shipped", "shipping", "delivered", "delivery", "dispatched",
-    "out for delivery", "return", "refund initiated", "tracking", "courier",
-)
-TRAVEL_RE = _kw(
-    "boarding", "pnr", "booking", "reservation", "ticket", "itinerary",
-    "check-in", "flight", "hotel", "e-ticket", "confirmed trip",
-)
-EXPIRY_RE = _kw(
-    "expire", "expires", "expiring", "expired", "renewal", "renew", "due",
-    "overdue", "last day", "deadline", "action required", "final notice",
-    "suspended", "will be deleted",
-)
-PROMO_RE = _kw(
-    "sale", "off", "discount", "deal", "deals", "offer", "offers", "coupon",
-    "save", "free", "limited time", "exclusive", "flat", "cashback", "upgrade now",
-)
-NEWSLETTER_RE = _kw(
-    "newsletter", "digest", "weekly", "daily", "roundup", "issue", "edition",
-    "this week", "top stories", "read more",
-)
+
+#: Keyword packs, one per language or country. Each family's pattern is the
+#: union of the enabled packs; an account with no `locales` set gets all of
+#: them. English and India together reproduce the original single list.
+LOCALES: dict[str, dict[str, tuple[str, ...]]] = {
+    "en": {
+        "finance": (
+            "invoice", "invoices", "statement", "statements", "receipt", "receipts",
+            "transaction", "payment", "paid", "credited", "debited", "refund", "bill",
+            "billing", "tax", "salary", "payslip", "premium", "portfolio",
+            "dividend", "settlement",
+        ),
+        "security": (
+            "otp", "one-time", "verification", "verify", "sign-in", "sign in",
+            "signin", "login", "log in", "password", "2fa", "two-factor",
+            "security alert", "suspicious", "unauthorized", "authenticate",
+            "passcode", "recovery",
+        ),
+        "orders": (
+            "order", "shipped", "shipping", "delivered", "delivery", "dispatched",
+            "out for delivery", "return", "refund initiated", "tracking", "courier",
+        ),
+        "travel": (
+            "boarding", "booking", "reservation", "ticket", "itinerary",
+            "check-in", "flight", "hotel", "e-ticket", "confirmed trip",
+        ),
+        "expiry": (
+            "expire", "expires", "expiring", "expired", "renewal", "renew", "due",
+            "overdue", "last day", "deadline", "action required", "final notice",
+            "suspended", "will be deleted",
+        ),
+        "promo": (
+            "sale", "off", "discount", "deal", "deals", "offer", "offers", "coupon",
+            "save", "free", "limited time", "exclusive", "flat", "cashback",
+            "upgrade now",
+        ),
+        "newsletter": (
+            "newsletter", "digest", "weekly", "daily", "roundup", "issue", "edition",
+            "this week", "top stories", "read more",
+        ),
+        "finance_domains": (
+            "bank", "paypal", "stripe", "insurance", "amex", "visa", "mastercard",
+        ),
+    },
+    "in": {
+        "finance": ("gst", "tds", "emi", "mutual fund"),
+        "travel": ("pnr",),
+        "finance_domains": (
+            "icici", "hdfc", "sbi", "axis", "kotak", "razorpay", "zerodha", "groww",
+            "upstox", "acko", "policybazaar", "incometax", "gov.in", "cred.club",
+        ),
+    },
+    "us": {
+        "finance": ("w-2", "1099", "401k", "ach", "escrow"),
+        "finance_domains": (
+            "irs.gov", "chase", "wellsfargo", "bankofamerica", "capitalone",
+            "venmo", "schwab", "fidelity", "vanguard", "discover",
+        ),
+    },
+    "uk": {
+        "finance": ("hmrc", "direct debit", "council tax", "vat", "payslip"),
+        "finance_domains": (
+            "hmrc.gov.uk", "barclays", "hsbc", "lloyds", "natwest", "monzo",
+            "revolut", "nationwide", "santander",
+        ),
+    },
+    "de": {
+        "finance": (
+            "rechnung", "zahlung", "kontoauszug", "quittung", "überweisung",
+            "gutschrift", "steuer", "lastschrift", "beitrag",
+        ),
+        "security": (
+            "passwort", "anmeldung", "bestätigungscode", "sicherheitswarnung",
+            "verifizierung", "einmalcode",
+        ),
+        "orders": (
+            "bestellung", "versand", "versandt", "lieferung", "zugestellt",
+            "rücksendung", "sendungsverfolgung",
+        ),
+        "travel": ("buchung", "reservierung", "flug", "bordkarte"),
+        "expiry": ("läuft ab", "abgelaufen", "frist", "fällig", "mahnung",
+                   "letzte erinnerung"),
+        "promo": ("rabatt", "angebot", "gutschein", "sparen", "kostenlos"),
+        "newsletter": ("wöchentlich", "ausgabe"),
+        "finance_domains": ("sparkasse", "volksbank", "commerzbank", "deutsche-bank",
+                            "n26", "elster"),
+    },
+    "fr": {
+        "finance": ("facture", "paiement", "relevé", "reçu", "virement",
+                    "remboursement", "impôts", "prélèvement"),
+        "security": ("mot de passe", "connexion", "code de vérification",
+                     "alerte de sécurité"),
+        "orders": ("commande", "expédié", "expédition", "livraison", "livré", "suivi"),
+        "travel": ("réservation", "votre vol", "billet", "carte d'embarquement"),
+        "expiry": ("expiration", "échéance", "renouvellement", "dernier rappel"),
+        "promo": ("réduction", "offre", "soldes", "code promo", "gratuit"),
+        "newsletter": ("hebdomadaire", "édition"),
+        "finance_domains": ("impots.gouv", "credit-agricole", "societegenerale",
+                            "bnpparibas", "labanquepostale", "boursorama"),
+    },
+    "es": {
+        "finance": ("factura", "pago", "extracto", "recibo", "transferencia",
+                    "reembolso", "impuestos"),
+        "security": ("contraseña", "inicio de sesión", "código de verificación",
+                     "alerta de seguridad"),
+        "orders": ("pedido", "enviado", "envío", "entrega", "entregado",
+                   "devolución", "seguimiento"),
+        "travel": ("reserva", "vuelo", "billete", "tarjeta de embarque"),
+        "expiry": ("vence", "caduca", "vencimiento", "renovación", "último aviso"),
+        "promo": ("descuento", "oferta", "cupón", "rebajas", "gratis"),
+        "newsletter": ("boletín", "semanal", "edición"),
+        "finance_domains": ("bbva", "caixabank", "bancosantander", "sabadell",
+                            "agenciatributaria"),
+    },
+}
+
+FAMILIES = ("finance", "security", "orders", "travel", "expiry", "promo", "newsletter")
+
+
+@dataclass(frozen=True)
+class Patterns:
+    finance: re.Pattern
+    security: re.Pattern
+    orders: re.Pattern
+    travel: re.Pattern
+    expiry: re.Pattern
+    promo: re.Pattern
+    newsletter: re.Pattern
+    finance_domains: tuple[str, ...]
+
+
+_PATTERN_CACHE: dict[tuple[str, ...], Patterns] = {}
+
+
+def patterns(locales=None) -> Patterns:
+    """Compiled keyword families for the enabled packs (all of them if none)."""
+    chosen = tuple(sorted(l for l in (locales or ()) if l in LOCALES)) or tuple(LOCALES)
+    if chosen not in _PATTERN_CACHE:
+        words = {f: [] for f in (*FAMILIES, "finance_domains")}
+        for loc in chosen:
+            for fam, ws in LOCALES[loc].items():
+                for w in ws:
+                    if w not in words[fam]:
+                        words[fam].append(w)
+        _PATTERN_CACHE[chosen] = Patterns(
+            **{f: _kw(*(words[f] or ["(?!x)x"])) for f in FAMILIES},
+            finance_domains=tuple(words["finance_domains"]),
+        )
+    return _PATTERN_CACHE[chosen]
+
+
+_ALL = patterns()
+# The full-pack patterns under their old names, for anything importing them.
+FINANCE_RE = _ALL.finance
+SECURITY_RE = _ALL.security
+ORDER_RE = _ALL.orders
+TRAVEL_RE = _ALL.travel
+EXPIRY_RE = _ALL.expiry
+PROMO_RE = _ALL.promo
+NEWSLETTER_RE = _ALL.newsletter
+FINANCE_HINT_DOMAINS = _ALL.finance_domains
 
 DEV_DOMAINS = {
     "github.com", "gitlab.com", "bitbucket.org", "circleci.com", "travis-ci.org",
@@ -81,11 +210,6 @@ SOCIAL_DOMAINS = {
     "instagram.com", "quora.com", "reddit.com", "pinterest.com", "meetup.com",
     "tiktok.com", "threads.net", "discord.com", "youtube.com",
 }
-FINANCE_HINT_DOMAINS = (
-    "bank", "icici", "hdfc", "sbi", "axis", "kotak", "paypal", "stripe",
-    "razorpay", "zerodha", "groww", "upstox", "insurance", "acko", "policybazaar",
-    "incometax", "gov.in", "irs.gov", "amex", "visa", "mastercard", "cred.club",
-)
 WORK_ISH_DOMAINS = {"slack.com", "notion.so", "zoom.us", "asana.com", "figma.com"}
 
 
@@ -100,8 +224,17 @@ class Verdict:
     reasons: list[str]
 
 
-def classify(m: dict) -> Verdict:
-    """`m` is a normalized email row dict (see sync.normalize)."""
+def classify(m: dict, locales=None, correspondents=None) -> Verdict:
+    """`m` is a normalized email row dict (see sync.normalize).
+
+    `locales` picks the keyword packs (default: all). `correspondents` is the
+    set of addresses the account owner has sent mail to; mail from them is
+    treated as a real conversation.
+    """
+    P = patterns(locales)
+    FINANCE_RE, SECURITY_RE, ORDER_RE = P.finance, P.security, P.orders
+    TRAVEL_RE, EXPIRY_RE, PROMO_RE = P.travel, P.expiry, P.promo
+    NEWSLETTER_RE, FINANCE_HINT_DOMAINS = P.newsletter, P.finance_domains
     subject = (m.get("subject") or "")
     domain = (m.get("from_domain") or "").lower()
     local = (m.get("from_email") or "").split("@")[0].lower()
@@ -128,7 +261,11 @@ def classify(m: dict) -> Verdict:
     category, sub = "unknown", ""
 
     # -- category ----------------------------------------------------------
-    if SECURITY_RE.search(subject):
+    if local in ("mailer-daemon", "postmaster"):
+        # Bounces mention "delivery" and "failure"; they are not orders.
+        category, sub, conf = "automated", "bounce", 0.9
+        reasons.append("mail system notice")
+    elif SECURITY_RE.search(subject):
         category, sub, conf = "security", _sec_sub(subject), 0.9
         reasons.append("security wording in subject")
     elif FINANCE_RE.search(subject) or any(h in domain for h in FINANCE_HINT_DOMAINS):
@@ -175,14 +312,25 @@ def classify(m: dict) -> Verdict:
     if category in ("human", "unknown") and important:
         conf = min(conf + 0.1, 0.95)
 
+    # Someone you have written to is a correspondent, whatever their address
+    # looks like. Mailing lists are excluded: replying to a list once does not
+    # make every post on it a conversation.
+    sender = (m.get("from_email") or "").lower()
+    replied = bool(correspondents) and sender in correspondents and not has_list
+    if replied and category in ("automated", "unknown"):
+        category, conf = "human", 0.75
+
     # -- protection --------------------------------------------------------
     protected = category in ("finance", "security", "travel", "human") or (
         category == "orders" and not PROMO_RE.search(subject)
     )
+    if replied:
+        protected = True
+        reasons.append("you have written to this sender")
     if starred:
         protected = True
         reasons.append("starred/flagged by you")
-    if category in ("newsletter", "promotion", "social") and not starred:
+    if category in ("newsletter", "promotion", "social") and not (starred or replied):
         protected = False
 
     # -- attention ---------------------------------------------------------
@@ -195,7 +343,7 @@ def classify(m: dict) -> Verdict:
         reasons.append("deadline / expiry wording")
     elif category in ("finance", "travel") and unread:
         attention = POTENTIALLY_IMPORTANT
-    elif category == "human" and unread and inbox:
+    elif (category == "human" or replied) and unread and inbox:
         attention = POTENTIALLY_IMPORTANT
     elif starred or (important and unread):
         attention = POTENTIALLY_IMPORTANT
@@ -207,6 +355,13 @@ def classify(m: dict) -> Verdict:
         attention = NO_ATTENTION
     else:
         attention = INFORMATIONAL
+
+    # Something with a deadline that you have not read yet stays out of bulk
+    # actions until you have seen it - unless it is plainly marketing.
+    if attention == ACTION_REQUIRED and category not in ("promotion", "newsletter", "social"):
+        if not protected:
+            reasons.append("unread and time-sensitive")
+        protected = True
 
     # -- retention ---------------------------------------------------------
     age_days = m.get("age_days", 0) or 0

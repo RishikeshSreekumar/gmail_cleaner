@@ -45,10 +45,20 @@ not be merged, however convenient it is.
 5. **Accounts never mix.** One index file per account; no query spans two
    mailboxes.
 6. **The classifier stays deterministic and offline.** No network calls, no
-   model, no LLM in the classification path.
+   model, no LLM in the classification path. The optional LLM advisor sits
+   outside it: off unless switched on per account from the terminal, it only
+   *proposes* rules, a person accepts each one, and it may add protection but
+   never remove it.
 7. **The GUI stays local.** Bound to `127.0.0.1`, token-guarded, and the browser
-   names a target rather than sending SQL.
+   names a target or a whitelisted filter (`policies.FIELDS`) rather than
+   sending SQL. The same goes for the MCP server, which is read-only.
 8. **Nothing phones home.** No telemetry, no analytics, no crash reporting.
+   The only outbound requests are ones the user starts: the mail server, a
+   one-click unsubscribe they confirmed, and an LLM provider they configured.
+9. **Automation never trashes.** Compound rules may archive, mark read, label
+   or star, only on accounts with actions enabled, never on protected mail, and
+   only when marked auto and explicitly applied (by command or a schedule the
+   user installed).
 
 ## Where things live
 

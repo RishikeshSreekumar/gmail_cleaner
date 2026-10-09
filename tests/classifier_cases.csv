@@ -1,0 +1,57 @@
+from_email,subject,list_id,true_category,true_protected,unread,starred,age_days
+alerts@icicibank.com,Rs.4200 debited from your account,,finance,1,1,0,10
+statements@hdfcbank.net,Your credit card statement for May,,finance,1,1,0,10
+billing@stripe.com,Your receipt from Acme Inc,,finance,1,0,0,10
+no-reply@paypal.com,You sent a payment to John,,finance,1,0,0,10
+service@chase.com,Your monthly statement is ready,,finance,1,1,0,10
+noreply@hmrc.gov.uk,Your tax return is due,,finance,1,1,0,10
+rechnung@telekom.de,Ihre Rechnung für Mai,,finance,1,1,0,10
+facturation@free.fr,Votre facture est disponible,,finance,1,1,0,10
+facturas@movistar.es,Tu factura de junio,,finance,1,1,0,10
+billing@amazonaws.com,Your AWS Invoice is available,,finance,1,0,0,10
+no-reply@accounts.google.com,Security alert: new sign-in on Mac,,security,1,1,0,10
+noreply@github.com,[GitHub] Please verify your device,,security,1,1,0,10
+account-security@microsoft.com,Unusual sign-in activity,,security,1,1,0,10
+no-reply@login.example.com,Your one-time passcode is 449281,,security,1,1,0,1
+konto@bank.de,Ihr Bestätigungscode,,security,1,1,0,10
+securite@banque.fr,Alerte de sécurité sur votre compte,,security,1,1,0,10
+seguridad@banco.es,Tu código de verificación,,security,1,1,0,10
+auto-confirm@amazon.in,Your order has been shipped,,orders,1,0,0,10
+shipment-tracking@amazon.com,Out for delivery today,,orders,1,0,0,10
+versand@zalando.de,Ihre Bestellung wurde versandt,,orders,1,0,0,10
+commandes@fnac.com,Votre commande a été expédiée,,orders,1,0,0,10
+pedidos@elcorteingles.es,Tu pedido ha sido enviado,,orders,1,0,0,10
+bookings@makemytrip.com,Your flight PNR X8K2L is confirmed,,travel,1,0,0,10
+noreply@booking.com,Your reservation at Hotel Lumen,,travel,1,0,0,10
+checkin@airline.com,Boarding pass for your flight,,travel,1,1,0,10
+buchung@bahn.de,Ihre Buchung: Flug nach Berlin,,travel,1,0,0,10
+reservas@iberia.es,Tu tarjeta de embarque,,travel,1,0,0,10
+notifications@github.com,PR #42 merged,,developer,0,1,0,10
+builds@circleci.com,Build failed on main,,developer,0,1,0,10
+alerts@sentry.io,New issue in production,,developer,0,1,0,10
+messages-noreply@linkedin.com,You have 3 new connection requests,,social,0,1,0,10
+notification@facebookmail.com,Someone commented on your post,,social,0,1,0,10
+digest@quora.com,10 answers for you,<digest.quora.com>,social,0,1,0,10
+newsletter@medium.com,Your Daily Digest,<newsletter.medium.com>,newsletter,0,1,0,10
+hello@substack.com,This week in tech: issue 42,<weekly.substack.com>,newsletter,0,1,0,10
+news@economist.com,The week ahead,<news.economist.com>,newsletter,0,1,0,10
+offers@swiggy.in,FLAT 60% OFF today only,,promotion,0,1,0,10
+deals@flipkart.com,Big Billion Days sale starts now,,promotion,0,1,0,10
+marketing@shop.com,Exclusive offer just for you,,promotion,0,1,0,10
+angebote@mediamarkt.de,Unser Angebot: 20% Rabatt,,promotion,0,1,0,10
+promo@cdiscount.fr,Soldes : jusqu'à -70%,,promotion,0,1,0,10
+ofertas@zara.es,Rebajas: descuento del 50%,,promotion,0,1,0,10
+priya@example.com,Re: dinner on Friday?,,human,1,1,0,10
+arjun.k@gmail.com,the deck from yesterday,,human,1,1,0,10
+mom@family.net,photos from the trip,,human,1,0,0,10
+lena.mueller@web.de,Treffen am Montag,,human,1,1,0,10
+updates@slack.com,New messages in #general,,work,0,1,0,10
+team@notion.so,Weekly workspace summary,,work,0,1,0,10
+noreply@service.com,Your weekly report,,automated,0,1,0,10
+mailer-daemon@googlemail.com,Delivery Status Notification,,automated,0,1,0,10
+alerts@uptimerobot.com,Monitor is UP,,automated,0,1,0,10
+renewals@insurer.com,Your policy renewal is due,,finance,1,1,0,10
+support@domain-registrar.com,Your domain expires in 7 days,,automated,1,1,0,10
+newsletter@bank.com,Our top savings tips this month,<news.bank.com>,finance,0,1,0,10
+noreply@favourite-shop.com,Thanks for your order,,orders,1,0,1,10
+no-reply@login.example.com,Your OTP is 118822,,security,0,0,0,40

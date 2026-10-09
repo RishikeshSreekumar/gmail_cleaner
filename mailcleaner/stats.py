@@ -274,3 +274,90 @@ def ago(ts: int | None) -> str:
     if d < 365:
         return f"{int(d / 30)}mo"
     return f"{d / 365:.1f}y"
+
+
+def alerts(conn, limit: int = 10) -> list[dict]:
+    """Senders whose volume jumped: new and already loud, or well above their
+    own rate over the two months before."""
+    rows = _grouped(conn, "from_email", 100000, "d30",
+                    "AND received_at > ?", (_cut(90),))
+    out = []
+    for r in rows:
+        recent = (r["d30"] or 0) / 4.3
+        older = ((r["d90"] or 0) - (r["d30"] or 0)) / 8.6
+        if (r["d30"] or 0) < 5 or recent < 1.5:
+            continue
+        if older == 0:
+            kind, why = "new", f"new sender, {r['d30']} in the last 30 days"
+        elif recent >= older * 2.5:
+            kind, why = "surge", (f"{recent:.1f}/week now vs {older:.1f}/week "
+                                  "over the two months before")
+        else:
+            continue
+        out.append({**r, "kind": kind, "why": why,
+                    "older_per_week": round(older, 1)})
+    out.sort(key=lambda d: d["per_week"] - d["older_per_week"], reverse=True)
+    return out[:limit]
+
+
+def digest(conn, days: int = 7) -> dict:
+    """What changed recently, in the shape the scheduled job and `mclean digest`
+    report: volume, what wants attention, who got louder, what can go."""
+    since = _cut(days)
+    win = conn.execute(
+        "SELECT COUNT(*) n, SUM(is_unread) unread, SUM(size) bytes "
+        "FROM emails WHERE received_at > ?", (since,)
+    ).fetchone()
+    action = conn.execute(
+        "SELECT COUNT(*) c FROM emails WHERE is_unread=1 AND received_at > ? "
+        "AND attention='action required'", (since,)
+    ).fetchone()["c"]
+    important = conn.execute(
+        "SELECT COUNT(*) c FROM emails WHERE is_unread=1 AND received_at > ? "
+        "AND attention='potentially important'", (since,)
+    ).fetchone()["c"]
+    top = [dict(r) for r in conn.execute(
+        "SELECT from_email key, COUNT(*) emails, SUM(is_unread) unread "
+        "FROM emails WHERE received_at > ? GROUP BY from_email "
+        "ORDER BY emails DESC LIMIT 5", (since,)
+    )]
+    o = overview(conn)
+    pending = conn.execute(
+        "SELECT COUNT(*) c FROM llm_suggestions WHERE status='pending'"
+    ).fetchone()["c"]
+    return {
+        "days": days,
+        "new": win["n"] or 0,
+        "new_unread": win["unread"] or 0,
+        "new_bytes": win["bytes"] or 0,
+        "action_required": action,
+        "potentially_important": important,
+        "top_senders": top,
+        "alerts": alerts(conn, 5),
+        "cleanup": o["cleanup"],
+        "cleanup_bytes": o["cleanup_bytes"],
+        "pending_suggestions": pending,
+        "total": o["total"] or 0,
+    }
+
+
+def digest_text(d: dict, label: str = "") -> str:
+    """The digest as plain lines, for a terminal or a notification."""
+    head = f"{label}: " if label else ""
+    lines = [f"{head}{d['new']} new in {d['days']} days "
+             f"({d['new_unread']} unread, {human_size(d['new_bytes'])})"]
+    if d["action_required"] or d["potentially_important"]:
+        lines.append(f"  {d['action_required']} action required, "
+                     f"{d['potentially_important']} potentially important (unread)")
+    for a in d["alerts"]:
+        lines.append(f"  louder: {a['key']} - {a['why']}")
+    if d["top_senders"]:
+        lines.append("  most mail from: " + ", ".join(
+            f"{t['key']} ({t['emails']})" for t in d["top_senders"][:3]))
+    if d["cleanup"]:
+        lines.append(f"  {d['cleanup']} cleanup candidates "
+                     f"({human_size(d['cleanup_bytes'])})")
+    if d["pending_suggestions"]:
+        lines.append(f"  {d['pending_suggestions']} rule suggestions waiting: "
+                     "mclean llm review")
+    return "\n".join(lines)

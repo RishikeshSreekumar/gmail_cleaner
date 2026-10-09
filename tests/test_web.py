@@ -90,7 +90,7 @@ print("the add form validates provider, address, password, port and TLS mode")
 
 code, data = call("/api/account/add", {"provider": "gmail", "email": "bad@gmail.com",
                                        "password": "secret"})
-assert code == 502 and "rejected" in data["error"], data
+assert code == 400 and "rejected" in data["error"], data
 assert Store.load().accounts == [], "a mailbox that will not open is never kept"
 print("a failed connection adds nothing and leaves no credential behind")
 
@@ -179,7 +179,7 @@ print("multi-sender selections are bounded and never empty:", one_total, "matche
 # Read-only by default: no action can run.
 code, data = call("/api/action", {"action": "trash",
                                   "target": {"kind": "sender", "value": "x@y.com"}})
-assert code == 400 and "disabled" in data["error"], data
+assert code == 400 and "read-only" in data["error"], data
 print("read-only mode blocks actions")
 
 store = Store.load()

@@ -1,8 +1,10 @@
 """Local web GUI.
 
 A stdlib HTTP server on 127.0.0.1 plus one static page. No new dependencies and
-no framework: the browser is only a nicer renderer for the same read-only
-queries and the same guarded actions the terminal dashboard uses.
+no framework. This is the primary interface: everything a person needs -
+connecting mailboxes, turning actions on, rules, unsubscribing, the LLM
+advisor, background sync, exports - is reachable from the page, so nobody has
+to touch a terminal. The CLI remains for scripts and power users.
 
 Safety notes specific to serving over HTTP:
 
@@ -12,8 +14,19 @@ Safety notes specific to serving over HTTP:
   any other page in the browser from driving the API.
 - The Host header must be a loopback name, which blocks DNS rebinding.
 - The client never sends SQL. It names a *target* ("sender", "domain",
-  "category", "suggestion", ...) and the server builds the predicate, so the
-  browser cannot widen a selection beyond what the UI offers.
+  "category", "suggestion", "policy", ...) or a *filter* in the whitelisted
+  language of `policies.FIELDS`, and the server builds the predicate with
+  bound parameters, so the browser cannot reach a column or operator the UI
+  does not offer.
+- Turning on a cloud LLM provider requires an explicit consent flag in the
+  request, which the page only sends after the user ticks the box that says
+  what will leave the machine. An API key goes straight to the keychain and is
+  never returned by any endpoint.
+- Settings that change the machine (installing the background job) and the
+  mailbox (actions on) are separate, explicit requests; turning actions *off*
+  is always allowed.
+- Unsubscribing is an outbound request on the user's behalf, so it needs
+  actions enabled exactly like archive and trash do.
 - Connecting a mailbox from the page means an app password crosses this
   loopback socket. It is written straight to the keychain, never stored by the
   page, never logged, and never echoed back by any endpoint - `/api/accounts`
@@ -37,7 +50,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import accounts as acct_mod
-from . import actions, db, providers, stats, sync
+from . import actions, db, llm, policies, providers, stats, sync, unsubscribe
 from .accounts import Account, Store
 from .providers import MailError, oauth
 
@@ -102,6 +115,13 @@ def build_where(target: dict) -> tuple[str, tuple]:
         except (ValueError, TypeError, IndexError):
             raise Denied("unknown cleanup suggestion")
         return where, ()
+    if kind == "filter":
+        try:
+            return policies.compile_filter(value or {})
+        except policies.FilterError as e:
+            raise Denied(str(e))
+    if kind == "policy":
+        raise Denied("policy targets need the index; use build_where_conn")
     if kind == "age":
         try:
             _name, lo, hi = stats.AGE_BUCKETS[int(value)]
@@ -114,8 +134,28 @@ def build_where(target: dict) -> tuple[str, tuple]:
     raise Denied(f"unknown target {kind!r}")
 
 
+def build_where_conn(conn, target: dict) -> tuple[str, tuple]:
+    """build_where, plus targets that need the index to resolve (policies)."""
+    if target.get("kind") == "policy":
+        try:
+            p = policies.get(conn, int(target.get("value")))
+        except (TypeError, ValueError):
+            p = None
+        if not p:
+            raise Denied("unknown rule")
+        return policies.where_for(p)
+    return build_where(target)
+
+
 def target_title(target: dict) -> str:
     kind = target.get("kind")
+    if kind == "filter":
+        try:
+            return policies.describe(target.get("value") or {})
+        except policies.FilterError:
+            return "filter"
+    if kind == "policy":
+        return f"rule {target.get('value')}"
     if kind == "suggestion":
         return stats.CLEANUP_SUGGESTIONS[int(target["value"])][0]
     if kind == "age":
@@ -163,8 +203,7 @@ def account_from_body(store: Store, body: dict) -> Account:
     account = Account.from_provider(key, email, **over)
     if store.get(account.id):
         raise Denied(
-            f"{email} is already connected as {account.id}. "
-            "Remove it first with: mclean remove " + account.id
+            f"{email} is already connected. To sign in again, open Settings."
         )
     return account
 
@@ -187,6 +226,23 @@ def verify_and_store(store: Store, account: Account) -> dict:
     db.connect(account).close()
     return {"id": account.id, "label": account.display,
             "provider": account.provider_info.name, "folders": folders}
+
+
+def replace_credential(account: Account, write, suffix: str = "") -> None:
+    """Swap in a new credential for an existing mailbox, keeping the old one if
+    the new one does not work. Unlike adding, a failure never touches the
+    account's directory or index."""
+    old = acct_mod._read_secret(account, suffix)
+    write()
+    try:
+        with acct_mod.backend(account):
+            pass
+    except Exception:
+        if old:
+            acct_mod._write_secret(account, suffix, old)
+        else:
+            acct_mod._drop_secret(account, suffix)
+        raise
 
 
 class OAuthJob:
@@ -215,7 +271,7 @@ class OAuthJob:
         with self.lock:
             self.state.update(kw)
 
-    def start(self, store: Store, account: Account) -> dict:
+    def start(self, store: Store, account: Account, reauth: bool = False) -> dict:
         with self.lock:
             if self.state["running"]:
                 return dict(self.state)
@@ -232,14 +288,21 @@ class OAuthJob:
                 message=f"Waiting for {account.email} to sign in...",
             )
         self.thread = threading.Thread(
-            target=self._run, args=(store, account, flow, device), daemon=True
+            target=self._run, args=(store, account, flow, device, reauth), daemon=True
         )
         self.thread.start()
         return self.snapshot()
 
-    def _run(self, store, account, flow, device) -> None:
+    def _run(self, store, account, flow, device, reauth=False) -> None:
         try:
             blob = oauth.poll_for_token(flow, device)
+            if reauth:
+                replace_credential(account, lambda: acct_mod.store_oauth(account, blob),
+                                   ".oauth")
+                self._set(running=False, account={"id": account.id,
+                                                  "label": account.display},
+                          code="", url="", message=f"Signed in again as {account.email}.")
+                return
             acct_mod.store_oauth(account, blob)
             added = verify_and_store(store, account)
             self._set(running=False, account=added, code="", url="",
@@ -292,8 +355,49 @@ class SyncJob:
             self._set(running=False, error=str(e), message="Sync failed.")
 
 
+class LLMJob:
+    """One rule-suggestion run at a time; a model can take a while."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.state = {"running": False, "done": 0, "total": 0, "message": "",
+                      "error": "", "result": None}
+
+    def snapshot(self) -> dict:
+        with self.lock:
+            return dict(self.state)
+
+    def _set(self, **kw) -> None:
+        with self.lock:
+            self.state.update(kw)
+
+    def start(self, account: Account, limit: int) -> dict:
+        with self.lock:
+            if self.state["running"]:
+                return dict(self.state)
+            self.state = {"running": True, "done": 0, "total": 0, "error": "",
+                          "message": "Asking the model...", "result": None}
+        threading.Thread(target=self._run, args=(account, limit), daemon=True).start()
+        return self.snapshot()
+
+    def _run(self, account: Account, limit: int) -> None:
+        conn = db.connect(account)
+        try:
+            res = llm.suggest_rules(
+                conn, account, limit=limit,
+                progress=lambda d, t: self._set(done=d, total=t,
+                                                message=f"Asked about {d}/{t} senders"))
+            self._set(running=False, result=res,
+                      message=f"{res['stored']} suggestions, {res['dropped']} dropped "
+                              "by the safety checks.")
+        except Exception as e:  # surfaced in the page, not swallowed
+            self._set(running=False, error=str(e), message="The model run failed.")
+        finally:
+            conn.close()
+
+
 class Handler(BaseHTTPRequestHandler):
-    server_version = "gmail-cleaner"
+    server_version = "mailcleaner"
     protocol_version = "HTTP/1.1"
 
     # --- plumbing -------------------------------------------------------
@@ -347,6 +451,20 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": "not found"}, 404)
         if not self._token_ok(query):
             return self._json({"error": "bad or missing token"}, 403)
+        if url.path == "/api/export":
+            try:
+                name, ctype, data = self.export(query)
+            except Denied as e:
+                return self._json({"error": str(e)}, 400)
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Disposition", f'attachment; filename="{name}"')
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(data)
+            return
 
         try:
             return self._json(self.api_get(url.path, query))
@@ -372,6 +490,88 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({"error": str(e)}, 500)
 
     # --- API ------------------------------------------------------------
+
+    EXPORT_COLUMNS = ("received_at from_name from_email from_domain subject size "
+                      "category subcategory attention retention protected is_unread "
+                      "is_inbox is_starred list_id folder").split()
+
+    def export(self, q: dict) -> tuple[str, str, bytes]:
+        """Senders, domains, categories or a selection of messages, as CSV/JSON."""
+        import csv
+        import io
+
+        one = lambda k, d=None: q.get(k, [d])[0]
+        what = one("what", "senders")
+        fmt = one("format", "csv")
+        if fmt not in ("csv", "json"):
+            raise Denied("format must be csv or json")
+        account = self.server.account
+        conn = db.connect(account)
+        try:
+            if what == "senders":
+                rows = stats.senders(conn, 100000)
+            elif what == "domains":
+                rows = stats.domains(conn, 100000)
+            elif what == "categories":
+                rows = stats.categories(conn)
+            elif what == "messages":
+                target = {"kind": one("kind"), "value": one("value")}
+                if target["kind"] == "filter":
+                    try:
+                        target["value"] = json.loads(target["value"] or "{}")
+                    except json.JSONDecodeError:
+                        raise Denied("bad filter")
+                where, params = (build_where_conn(conn, target) if target["kind"]
+                                 else ("1=1", ()))
+                rows = [{c: r[c] for c in self.EXPORT_COLUMNS}
+                        for r in stats.messages(conn, where, params, limit=1_000_000)]
+            else:
+                raise Denied("export senders, domains, categories or messages")
+        finally:
+            conn.close()
+        stamp = time.strftime("%Y%m%d")
+        name = f"mailcleaner-{account.id}-{what}-{stamp}.{fmt}"
+        if fmt == "json":
+            return name, "application/json", json.dumps(rows, default=str, indent=2).encode()
+        buf = io.StringIO()
+        if rows:
+            w = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
+            w.writeheader()
+            w.writerows(rows)
+        return name, "text/csv; charset=utf-8", buf.getvalue().encode()
+
+    def settings(self, account: Account, conn) -> dict:
+        from . import schedule
+        from .classify import LOCALES
+
+        return {
+            "version": __import__("mailcleaner").__version__,
+            "account": {
+                "id": account.id, "email": account.email, "label": account.display,
+                "provider": account.provider, "provider_name": account.provider_info.name,
+                "uses_oauth": account.provider_info.uses_oauth,
+                "host": account.host, "port": account.port, "security": account.security,
+                "credential": acct_mod.get_secret(account) is not None,
+                "actions_enabled": account.actions_enabled,
+                "sync_days": account.sync_days, "review_label": account.review_label,
+                "locales": account.locales,
+                "setup_url": account.provider_info.setup_url,
+                "messages": stats.overview(conn)["total"] or 0,
+                "last_sync": db.get_state(conn, "last_sync"),
+            },
+            "locales": {k: sorted({w for fam in v.values() for w in fam})[:6]
+                        for k, v in LOCALES.items()},
+            "llm": {
+                "provider": account.llm_provider, "model": account.llm_model,
+                "host": account.llm_host or llm.OLLAMA_HOST,
+                "share_subjects": account.llm_share_subjects,
+                "has_key": bool(acct_mod.get_llm_key(account)),
+                "defaults": llm.DEFAULT_MODELS,
+            },
+            "schedule": schedule.status(),
+            "mcp": {"command": schedule.mclean_command() + ["mcp"]},
+        }
+
 
     def api_get(self, path: str, q: dict):
         if path == "/api/providers":
@@ -409,6 +609,9 @@ class Handler(BaseHTTPRequestHandler):
                     "categories": stats.categories(conn),
                     "top_senders": stats.senders(conn, 10),
                     "top_domains": stats.domains(conn, 10),
+                    "alerts": stats.alerts(conn, 5),
+                    "llm_provider": account.llm_provider,
+                    "pending_suggestions": len(llm.suggestions(conn)),
                 }
             if path == "/api/senders":
                 return {"rows": stats.senders(
@@ -423,10 +626,15 @@ class Handler(BaseHTTPRequestHandler):
                 if not row:
                     raise Denied("unknown sender")
                 where, params = build_where({"kind": "sender", "value": email})
+                unsub = unsubscribe.options(conn, email)
                 return {
                     "row": row,
                     "categories": stats.category_breakdown(conn, where, params),
                     "samples": stats.messages(conn, where, params, limit=8),
+                    # How, and to which host - never the URL, which usually
+                    # carries a token identifying the recipient.
+                    "unsubscribe": ({"method": unsub["method"], "host": unsub["host"]}
+                                    if unsub else None),
                 }
             if path == "/api/categories":
                 return {"rows": stats.categories(conn)}
@@ -444,8 +652,46 @@ class Handler(BaseHTTPRequestHandler):
                 return {"rows": rows}
             if path == "/api/history":
                 return {"rows": actions.batches(conn, limit)}
+            if path == "/api/alerts":
+                return {"rows": stats.alerts(conn, 20)}
+            if path == "/api/settings":
+                return self.settings(account, conn)
+            if path == "/api/doctor":
+                from . import doctor
+
+                checks = doctor.diagnose(account) + doctor.index_checks(account)
+                return {"checks": [c.__dict__ for c in checks]}
+            if path == "/api/eval/sample":
+                n = max(5, min(int(one("n", "30") or 30), 200))
+                rows = conn.execute(
+                    "SELECT msg_key, from_email, subject, category, protected "
+                    "FROM emails ORDER BY RANDOM() LIMIT ?", (n,)).fetchall()
+                return {"rows": [dict(r) for r in rows],
+                        "categories": list(llm.CATEGORIES) + ["unknown"]}
+            if path == "/api/llm/models":
+                return {"models": ollama_models(one("host") or account.llm_host
+                                                or llm.OLLAMA_HOST)}
+            if path == "/api/digest":
+                return stats.digest(conn, max(1, min(int(one("days", "7") or 7), 365)))
+            if path == "/api/rules":
+                return {
+                    "rules": [dict(r) for r in conn.execute(
+                        "SELECT * FROM rules ORDER BY id DESC")],
+                    "policies": policies.list_all(conn),
+                    "fields": {k: {"kind": v[0], "help": v[1]}
+                               for k, v in policies.FIELDS.items()},
+                    "policy_actions": list(policies.POLICY_ACTIONS),
+                }
+            if path == "/api/unsubscribe":
+                return {"rows": unsubscribe.senders(conn, limit),
+                        "history": unsubscribe.history(conn, 50)}
+            if path == "/api/llm":
+                return {"provider": account.llm_provider, "model": account.llm_model,
+                        "share_subjects": account.llm_share_subjects,
+                        "pending": llm.suggestions(conn),
+                        "job": self.server.llm_job.snapshot()}
             if path == "/api/messages":
-                where, params = build_where(
+                where, params = build_where_conn(conn,
                     {"kind": one("kind"), "value": one("value")})
                 return {
                     "title": target_title({"kind": one("kind"), "value": one("value")}),
@@ -480,7 +726,12 @@ class Handler(BaseHTTPRequestHandler):
             if not password:
                 raise Denied("this provider needs an app password")
             acct_mod.set_password(account, password)
-            added = verify_and_store(store, account)
+            try:
+                added = verify_and_store(store, account)
+            except MailError as e:
+                from . import doctor
+
+                raise Denied(f"{e} {doctor.login_fix(account.provider, str(e))}")
             return {**added, "rows": self.server.account_rows()}
 
         if path == "/api/account/oauth/start":
@@ -512,7 +763,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/api/preview":
                 target = body.get("target") or {}
-                where, params = build_where(target)
+                where, params = build_where_conn(conn, target)
                 info = actions.preview(conn, where, params)
                 info["title"] = target_title(target)
                 info["actions_enabled"] = account.actions_enabled
@@ -520,14 +771,11 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/action":
                 if not account.actions_enabled:
-                    raise Denied(
-                        "Actions are disabled for this account. Run "
-                        f"`mclean enable-actions -a {account.id}` first."
-                    )
+                    raise Denied("This mailbox is read-only. Turn on actions in Settings.")
                 action = body.get("action")
                 if action not in actions.ALL_ACTIONS:
                     raise Denied(f"unknown action {action!r}")
-                where, params = build_where(body.get("target") or {})
+                where, params = build_where_conn(conn, body.get("target") or {})
                 label = body.get("label") or (
                     account.review_label if action == actions.LABEL else None
                 )
@@ -546,9 +794,205 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/reclassify":
                 return {"reclassified": sync.reclassify_all(conn)}
 
+            if path == "/api/settings/actions":
+                store = self.server.store
+                acct = store.get(account.id)
+                acct.actions_enabled = bool(body.get("enabled"))
+                store.update(acct)
+                return {"actions_enabled": acct.actions_enabled}
+            if path == "/api/settings/account":
+                store = self.server.store
+                acct = store.get(account.id)
+                if "sync_days" in body:
+                    try:
+                        days = int(body["sync_days"])
+                    except (TypeError, ValueError):
+                        raise Denied("sync window must be a number of days")
+                    if not 7 <= days <= 36500:
+                        raise Denied("sync window must be between 7 days and 100 years")
+                    acct.sync_days = days
+                if "label" in body:
+                    acct.label = str(body["label"] or "").strip()[:60] or acct.email
+                if "review_label" in body:
+                    acct.review_label = str(body["review_label"] or "").strip()[:80] \
+                        or "Cleanup/Review"
+                reclassified = None
+                if "locales" in body:
+                    from .classify import LOCALES
+
+                    chosen = [str(x) for x in (body["locales"] or [])]
+                    bad = [x for x in chosen if x not in LOCALES]
+                    if bad:
+                        raise Denied(f"unknown keyword pack(s): {', '.join(bad)}")
+                    acct.locales = [] if set(chosen) == set(LOCALES) else chosen
+                store.update(acct)
+                if "locales" in body:
+                    conn.close()
+                    conn = db.connect(acct)   # mirrors the new packs into the index
+                    reclassified = sync.reclassify_all(conn)
+                return {"ok": True, "reclassified": reclassified}
+            if path == "/api/settings/password":
+                if account.provider_info.uses_oauth:
+                    raise Denied("this mailbox signs in through the browser")
+                password = str(body.get("password") or "").replace(" ", "").strip()
+                if not password:
+                    raise Denied("enter the new app password")
+                replace_credential(account,
+                                   lambda: acct_mod.set_password(account, password))
+                return {"ok": True}
+            if path == "/api/settings/oauth":
+                if not account.provider_info.uses_oauth:
+                    raise Denied("this mailbox uses an app password")
+                return self.server.oauth_job.start(self.server.store, account, reauth=True)
+            if path == "/api/settings/remove":
+                if str(body.get("confirm") or "") != account.email:
+                    raise Denied("type the mailbox address to confirm")
+                conn.close()
+                store = self.server.store
+                store.remove(store.get(account.id), purge=True)
+                conn = None
+                return {"removed": account.id, "rows": self.server.account_rows()}
+            if path == "/api/settings/llm":
+                store = self.server.store
+                acct = store.get(account.id)
+                provider = str(body.get("provider") or "off")
+                if provider not in llm.PROVIDERS:
+                    raise Denied("unknown LLM provider")
+                if provider == "anthropic" and not body.get("cloud_consent"):
+                    raise Denied("tick the box to confirm sending sender details to Anthropic")
+                acct.llm_provider = provider
+                acct.llm_model = (str(body.get("model") or "").strip()[:100]
+                                  or llm.DEFAULT_MODELS.get(provider, ""))
+                host = str(body.get("host") or "").strip()
+                if host and not re.match(r"^https?://[^\s/]+(:\d+)?/?$", host):
+                    raise Denied("the Ollama address looks like http://127.0.0.1:11434")
+                acct.llm_host = host
+                acct.llm_share_subjects = bool(body.get("share_subjects", True))
+                key = str(body.get("api_key") or "").strip()
+                if provider == "anthropic" and key:
+                    acct_mod.set_llm_key(acct, key)
+                if provider != "anthropic" or body.get("forget_key"):
+                    acct_mod.clear_llm_key(acct)
+                store.update(acct)
+                return {"ok": True, "provider": provider, "model": acct.llm_model}
+            if path == "/api/settings/schedule":
+                from . import schedule
+
+                if body.get("remove"):
+                    return {"message": schedule.remove(), "status": schedule.status()}
+                try:
+                    msg = schedule.install(int(body.get("every") or 6),
+                                           bool(body.get("apply_rules")),
+                                           bool(body.get("notify", True)))
+                except (ValueError, RuntimeError) as e:
+                    raise Denied(str(e))
+                return {"message": msg, "status": schedule.status()}
+            if path == "/api/rules/apply":
+                if not account.actions_enabled:
+                    raise Denied("Turn on actions in Settings to apply rules.")
+                pid = body.get("id")
+                with acct_mod.backend(account) as client:
+                    res = policies.apply(conn, client, only_auto=pid is None,
+                                         policy_id=int(pid) if pid else None)
+                return {"results": res}
+            if path == "/api/eval/score":
+                from . import evaluate
+
+                rows = []
+                for r in (body.get("rows") or [])[:500]:
+                    key = str(r.get("msg_key") or "")
+                    hit = conn.execute("SELECT from_email, subject FROM emails "
+                                       "WHERE msg_key=?", (key,)).fetchone()
+                    if not hit:
+                        continue
+                    rows.append({"msg_key": key, "from_email": hit["from_email"],
+                                 "subject": hit["subject"],
+                                 "true_category": str(r.get("true_category") or ""),
+                                 "true_protected": "1" if r.get("true_protected") else "0"})
+                return evaluate.score(evaluate.predict_rows(rows, conn))
+
+            if path == "/api/rules/simple/add":
+                mtype = body.get("match_type")
+                if mtype not in ("sender", "domain"):
+                    raise Denied("rules match a sender or a domain")
+                act = body.get("action")
+                if act not in ("protect", "ignore"):
+                    raise Denied("rule action must be protect or ignore")
+                value = str(body.get("value") or "").strip().lower()
+                if not value or len(value) > 254:
+                    raise Denied("no sender or domain given")
+                actions.add_rule(conn, mtype, value, act)
+                return {"reclassified": sync.reclassify_all(conn)}
+            if path == "/api/rules/simple/remove":
+                actions.delete_rule(conn, int(body.get("id") or 0))
+                return {"reclassified": sync.reclassify_all(conn)}
+            if path == "/api/rules/add":
+                try:
+                    pid = policies.add(conn, str(body.get("name") or ""),
+                                       body.get("conditions") or {},
+                                       str(body.get("action") or ""),
+                                       body.get("label"), bool(body.get("auto")))
+                except policies.FilterError as e:
+                    raise Denied(str(e))
+                return {"id": pid}
+            if path == "/api/rules/remove":
+                return {"removed": policies.remove(conn, int(body.get("id") or 0))}
+            if path == "/api/rules/auto":
+                return {"ok": policies.set_auto(conn, int(body.get("id") or 0),
+                                                bool(body.get("auto")))}
+
+            if path == "/api/unsubscribe":
+                if not account.actions_enabled:
+                    raise Denied("Unsubscribing sends a request on your behalf, so it "
+                                 "needs actions on. Turn them on in Settings.")
+                try:
+                    return unsubscribe.unsubscribe(conn, str(body.get("sender") or ""))
+                except unsubscribe.UnsubscribeError as e:
+                    raise Denied(str(e))
+
+            if path == "/api/llm/suggest":
+                if account.llm_provider == "off":
+                    raise Denied("The assistant is off. Turn it on in Settings.")
+                limit = max(1, min(int(body.get("limit") or 40), 200))
+                return self.server.llm_job.start(account, limit)
+            if path == "/api/llm/status":
+                return self.server.llm_job.snapshot()
+            if path == "/api/llm/decide":
+                try:
+                    return llm.decide(conn, int(body.get("id") or 0),
+                                      bool(body.get("accept")))
+                except llm.LLMError as e:
+                    raise Denied(str(e))
+            if path == "/api/ask":
+                if account.llm_provider == "off":
+                    raise Denied("Plain-English search needs the assistant. "
+                                 "Turn it on in Settings.")
+                doms = [d["key"] for d in stats.domains(conn, 60)]
+                try:
+                    q = llm.parse_query(str(body.get("text") or ""), account,
+                                        known_domains=doms)
+                except llm.LLMError as e:
+                    raise Denied(str(e))
+                where, params = policies.compile_filter(q["filter"])
+                return {**q, "total": stats.count(conn, where, params)}
+
             raise Denied("unknown endpoint")
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
+
+
+def ollama_models(host: str) -> list[str]:
+    """Models an Ollama server has pulled; empty when it is not reachable."""
+    import urllib.request
+
+    if not re.match(r"^https?://[^\s/]+(:\d+)?/?$", host or ""):
+        return []
+    try:
+        with urllib.request.urlopen(host.rstrip("/") + "/api/tags", timeout=2) as r:
+            return sorted(m.get("name", "") for m in json.loads(r.read()).get("models", []))
+    except Exception:
+        return []
 
 
 class Server(ThreadingHTTPServer):
@@ -560,12 +1004,13 @@ class Server(ThreadingHTTPServer):
         self.token = token
         self.job = SyncJob()
         self.oauth_job = OAuthJob()
+        self.llm_job = LLMJob()
         self.verbose = verbose
 
     @property
     def store(self) -> Store:
-        """Re-read on every use so CLI changes (enable-actions, use, add) take
-        effect in an already-open browser tab."""
+        """Re-read on every use so a change made elsewhere (another tab, the
+        CLI, the background job) shows up in an already-open page."""
         return Store.load()
 
     @property
@@ -573,7 +1018,7 @@ class Server(ThreadingHTTPServer):
         store = self.store
         account = store.current
         if account is None:
-            raise Denied("No accounts configured. Run: mclean add")
+            raise Denied("No mailbox connected yet.")
         return account
 
     def account_rows(self) -> list[dict]:
@@ -587,14 +1032,27 @@ class Server(ThreadingHTTPServer):
         } for a in store.accounts]
 
 
+def bind(host: str, port: int, token: str, verbose: bool, tries: int = 20) -> Server:
+    """The first free port from `port` up: a second copy of the app, or anything
+    else on 8765, should not stop this one from starting."""
+    last = None
+    for p in range(port, port + tries):
+        try:
+            return Server((host, p), token, verbose)
+        except OSError as e:
+            last = e
+    raise OSError(f"no free port between {port} and {port + tries - 1}: {last}")
+
+
 def serve(host: str = "127.0.0.1", port: int = 8765,
           open_browser: bool = True, verbose: bool = False) -> None:
     """Run the GUI until Ctrl-C."""
     token = secrets.token_urlsafe(24)
-    server = Server((host, port), token, verbose)
+    server = bind(host, port, token, verbose)
     url = f"http://{host}:{server.server_address[1]}/?t={token}"
-    print(f"gmail-cleaner GUI: {url}")
-    print("Only this machine can reach it. Ctrl-C to stop.", flush=True)
+    print(f"mailcleaner is running at {url}")
+    print("Only this machine can reach it. Keep this window open; Ctrl-C stops it.",
+          flush=True)
     if open_browser:
         threading.Timer(0.4, webbrowser.open, args=(url,)).start()
     try:
