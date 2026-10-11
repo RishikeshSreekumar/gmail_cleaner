@@ -1,15 +1,20 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mclean</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='8' fill='%23924b2c'/%3E%3Cpath d='M7.5 10.25h13v8a1.25 1.25 0 0 1-1.25 1.25h-10.5A1.25 1.25 0 0 1 7.5 18.25z' fill='none' stroke='%23fff' stroke-width='1.5'/%3E%3Cpath d='M7.5 10.6 14 15.4l6.5-4.8' fill='none' stroke='%23fff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<title>mailcleaner</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%239e4421'/%3E%3Cg transform='translate%280 2.5%29'%3E%3Cpath d='M48 31v11a3.5 3.5 0 0 1-3.5 3.5h-27A3.5 3.5 0 0 1 14 42V23.5A3.5 3.5 0 0 1 17.5 20H40.5' fill='none' stroke='%23fff' stroke-width='6.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M16 22.5l10.5 8.75L49.5 13' fill='none' stroke='%23fff' stroke-width='6.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   /* Warm paper, ink-brown text, one terracotta accent and one green that only
      ever means "protected". Deliberately a single light theme.
-     Fonts are fetched if the machine is online and fall back cleanly if not. */
+     Fonts are fetched if the machine is online and fall back cleanly if not.
+
+     Layout rules, kept everywhere: one content column (max 1120px) whose
+     blocks all span its full width; 8px spacing steps; every page opens with
+     the same header (title, one-line lede, actions on the right); numbers are
+     right-aligned and tabular; tables share one grid component. */
   :root {
     --bg:      oklch(0.968 0.009 85);
     --panel:   oklch(0.985 0.006 85);
@@ -21,8 +26,8 @@
     --hair:    oklch(0.945 0.010 82);
     --ink:     oklch(0.24 0.012 60);
     --ink2:    oklch(0.30 0.012 60);
-    --dim:     oklch(0.55 0.012 60);
-    --dim2:    oklch(0.58 0.012 60);
+    --dim:     oklch(0.52 0.012 60);
+    --dim2:    oklch(0.60 0.012 60);
     --accent:  oklch(0.50 0.13 40);
     --accent-d:oklch(0.44 0.13 40);
     --accent-l:oklch(0.96 0.03 45);
@@ -31,33 +36,41 @@
     --green-bg:oklch(0.97 0.02 150);
     --green-ln:oklch(0.86 0.05 150);
     --up:      oklch(0.52 0.14 35);
+    --bad:     oklch(0.48 0.15 30);
+    --bad-bg:  oklch(0.97 0.02 30);
     --bar:     oklch(0.93 0.022 70);
     --dark:    oklch(0.22 0.012 60);
     --mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
     --sans: Geist, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+    --r: 10px;
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; padding: 0; background: var(--bg); }
-  body { font-family: var(--sans); font-size: 14px; color: var(--ink);
+  body { font-family: var(--sans); font-size: 14px; line-height: 1.45; color: var(--ink);
          -webkit-font-smoothing: antialiased; min-height: 100vh; }
   ::selection { background: oklch(0.88 0.05 150); }
   .mono { font-family: var(--mono); }
   .num  { font-variant-numeric: tabular-nums; }
+  .r { text-align: right; }
+  .dim { color: var(--dim); }
+  button { font: inherit; }
+  a { color: var(--accent); }
 
   /* ---------- header ---------- */
-  header { display: flex; align-items: center; gap: 20px; padding: 14px 28px;
+  header { display: flex; align-items: center; gap: 16px; height: 60px; padding: 0 24px;
     border-bottom: 1px solid var(--line); background: var(--panel);
     position: sticky; top: 0; z-index: 20; }
-  .brand { display: flex; align-items: center; gap: 9px; }
-  .brand .mark { display: block; border-radius: 8px; flex: none; }
-  .brand b { font-family: var(--mono); font-size: 15px; font-weight: 500;
-    letter-spacing: -0.02em; color: var(--ink); }
+  /* The wordmark: Geist SemiBold, lowercase, tracked -0.02em - the same
+     setting as assets/brand/wordmark.svg. */
+  .brand { display: flex; align-items: center; gap: 10px; flex: none; width: 170px;
+    color: var(--ink); text-decoration: none; }
+  .brand .mark { display: block; flex: none; }
+  .brand .name { font-size: 16.5px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
 
-  /* Account switcher: a menu, not a form control — it is a place you go, and
-     the last row is an action rather than a choice. */
-  .acct { position: relative; }
-  .acct-btn { display: flex; align-items: center; gap: 9px; max-width: 300px;
-    padding: 6px 10px 6px 8px; font: inherit; font-size: 13px; color: var(--ink);
+  .acct { position: relative; flex: none; }
+  .acct-btn { display: flex; align-items: center; gap: 9px; max-width: 280px; height: 36px;
+    padding: 0 10px 0 7px; font-size: 13px; color: var(--ink);
     background: none; border: 1px solid transparent; border-radius: 9px; cursor: pointer; }
   .acct-btn:hover, .acct-btn[aria-expanded="true"] { background: var(--white);
     border-color: var(--line); }
@@ -65,14 +78,14 @@
   .acct-btn .caret { flex: none; color: var(--dim); }
   .dot { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid;
     place-items: center; font-size: 11px; font-weight: 600; color: var(--white);
-    background: var(--accent); text-transform: uppercase; font-family: var(--sans); }
+    background: var(--accent); text-transform: uppercase; }
 
   .menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 50;
     min-width: 320px; padding: 6px; background: var(--card);
     border: 1px solid var(--line); border-radius: 13px;
     box-shadow: 0 12px 34px oklch(0.24 0.012 60 / 0.14); }
   .menu .mrow { display: flex; align-items: center; gap: 10px; width: 100%;
-    padding: 9px 10px; font: inherit; text-align: left; background: none;
+    padding: 9px 10px; text-align: left; background: none;
     border: none; border-radius: 9px; cursor: pointer; color: var(--ink); }
   .menu .mrow:hover { background: var(--raised); }
   .menu .mrow .t { flex: 1; min-width: 0; }
@@ -84,259 +97,339 @@
   .menu .sep { height: 1px; margin: 6px 4px; background: var(--line); }
   .menu .mrow.add .dot { background: none; border: 1px dashed var(--line2);
     color: var(--dim); font-size: 14px; font-weight: 400; }
-  .menu .eyebrow { padding: 8px 10px 6px; font-size: 10.5px; letter-spacing: 0.07em;
-    text-transform: uppercase; color: var(--dim); }
-  .seg { display: flex; gap: 2px; padding: 2px; background: oklch(0.94 0.012 82);
-    border-radius: 8px; margin-left: 8px; }
-  .seg button { padding: 5px 11px; border: none; border-radius: 6px;
-    font-family: var(--sans); font-size: 12.5px; cursor: pointer;
-    background: none; color: oklch(0.45 0.012 60); }
-  .seg button.on { font-weight: 500; background: var(--white); color: var(--ink);
-    box-shadow: 0 1px 2px oklch(0.24 0.012 60 / 0.1); }
+  .menu .eyebrow { padding: 8px 10px 6px; margin: 0; }
+
+  #ask { flex: 1 1 360px; max-width: 440px; position: relative; }
+  #ask input { width: 100%; height: 36px; padding: 0 12px 0 34px;
+    border: 1px solid var(--line2); border-radius: 9px; background: var(--white);
+    font-size: 13px; color: var(--ink); outline: none; }
+  #ask input:focus { border-color: oklch(0.6 0.06 40); }
+  #ask svg { position: absolute; left: 11px; top: 11px; color: var(--dim2); }
   .spacer { flex: 1; }
-  .headstat { font-size: 13px; color: var(--dim); }
+
+  .mode { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px;
+    border: 1px solid var(--line2); border-radius: 999px; background: var(--white);
+    font-size: 12.5px; color: var(--ink2); cursor: pointer; white-space: nowrap; flex: none; }
+  .mode i { width: 7px; height: 7px; border-radius: 50%; background: var(--dim2); }
+  .mode.on { border-color: oklch(0.82 0.06 45); background: var(--accent-l); color: var(--accent-d); }
+  .mode.on i { background: var(--accent); }
+  .syncbox { display: flex; align-items: center; gap: 10px; flex: none; }
+  #synced { font-size: 12.5px; color: var(--dim); white-space: nowrap; }
 
   /* ---------- buttons ---------- */
-  .btn { padding: 7px 16px; border: 1px solid var(--line2); background: var(--white);
-    border-radius: 8px; font-family: var(--sans); font-size: 13px; font-weight: 500;
-    color: var(--ink2); cursor: pointer; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 34px; padding: 0 14px; border: 1px solid var(--line2); background: var(--white);
+    border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--ink2);
+    cursor: pointer; white-space: nowrap; }
   .btn:hover:not(:disabled) { border-color: oklch(0.7 0.02 80); }
-  .btn:disabled { opacity: .55; cursor: default; }
-  .btn.primary { padding: 9px 16px; border: none; background: var(--accent);
-    color: oklch(0.99 0.005 85); }
-  .btn.primary:hover:not(:disabled) { background: var(--accent-d); }
-  .btn.big { padding: 11px 20px; font-size: 14px; }
-  .btn.link { background: none; border: none; padding: 0; color: var(--accent);
-    font-size: 13px; font-weight: 500; cursor: pointer; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.primary { border-color: var(--accent); background: var(--accent); color: oklch(0.99 0.005 85); }
+  .btn.primary:hover:not(:disabled) { background: var(--accent-d); border-color: var(--accent-d); }
+  .btn.danger { border-color: var(--bad); background: var(--bad); color: var(--white); }
+  .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+  .btn.big { height: 40px; padding: 0 18px; font-size: 14px; }
+  .btn.link { height: auto; padding: 0; border: none; background: none; color: var(--accent); }
   .btn.link:hover { text-decoration: underline; }
-  .btn.quiet { border: none; background: none; color: var(--dim); padding: 9px 14px;
-    font-weight: 400; }
+  .btn.quiet { border-color: transparent; background: none; color: var(--dim); font-weight: 400; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
   /* ---------- shell ---------- */
   .shell { display: flex; align-items: flex-start; }
-  nav { width: 186px; flex: none; padding: 24px 16px; position: sticky; top: 57px;
-    display: flex; flex-direction: column; gap: 2px; }
-  nav button { text-align: left; padding: 8px 10px; border: none; border-radius: 7px;
-    font-family: var(--sans); font-size: 14px; cursor: pointer; background: none;
-    color: oklch(0.38 0.012 60); }
+  nav { width: 218px; flex: none; padding: 20px 12px 24px 24px; position: sticky; top: 60px;
+    max-height: calc(100vh - 60px); overflow-y: auto; }
+  nav .group { margin-bottom: 18px; }
+  nav .gl { padding: 0 10px 6px; font-size: 11px; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--dim2); }
+  nav button { display: flex; align-items: center; justify-content: space-between; width: 100%;
+    height: 32px; padding: 0 10px; border: none; border-radius: 7px; cursor: pointer;
+    background: none; color: oklch(0.36 0.012 60); font-size: 13.5px; text-align: left; }
   nav button:hover { background: oklch(0.945 0.012 80); }
   nav button.on { font-weight: 500; background: oklch(0.92 0.02 60); color: var(--dark); }
-  nav .rule { height: 1px; background: var(--line); margin: 14px 10px; }
-  nav .note { padding: 0 10px; font-size: 12px; line-height: 1.6; color: oklch(0.6 0.012 60); }
-  nav .note .row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  nav .count { font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  nav .note { margin-top: 6px; padding: 12px 10px 0; border-top: 1px solid var(--line);
+    font-size: 12px; line-height: 1.55; color: var(--dim2); }
+  nav .note .row { display: flex; align-items: center; gap: 7px; color: var(--green-d); }
   .swatch { width: 7px; height: 7px; border-radius: 2px; background: var(--green);
     display: inline-block; flex: none; }
-  main { flex: 1; min-width: 0; padding: 24px 28px 140px 12px; max-width: 1320px; }
+  main { flex: 1; min-width: 0; max-width: 1120px; padding: 28px 32px 140px 16px; }
+
+  /* ---------- page structure ---------- */
+  .pagehead { display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 24px; margin-bottom: 24px; flex-wrap: wrap; }
+  .pagehead h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .lede { margin: 6px 0 0; max-width: 640px; font-size: 13.5px; color: var(--dim); }
+  section { margin-top: 36px; }
+  .sechead { display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 16px; margin-bottom: 12px; }
+  .sechead h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .sechead p { margin: 3px 0 0; font-size: 13px; color: var(--dim); }
+  .eyebrow { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--dim2); margin-bottom: 6px; }
+  .card { border: 1px solid var(--line); border-radius: var(--r); background: var(--card); }
+  .note-box { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r);
+    background: var(--panel); font-size: 13px; line-height: 1.6; color: var(--ink2); }
+  .notice { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 16px; margin-top: 16px; border: 1px solid var(--line); border-radius: var(--r);
+    background: var(--panel); font-size: 13px; color: var(--ink2); flex-wrap: wrap; }
+  code { background: oklch(0.945 0.012 82); padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--line); font-family: var(--mono); font-size: 12px; }
+  pre.code { margin: 0; padding: 12px 14px; overflow-x: auto; background: var(--raised);
+    border: 1px solid var(--line); border-radius: 8px; font-family: var(--mono);
+    font-size: 12px; line-height: 1.55; }
+  .err { color: var(--bad); }
+  .loading { padding: 40px 0; color: var(--dim); font-size: 13px; }
 
   /* ---------- overview ---------- */
-  .hero { display: flex; align-items: flex-end; gap: 40px; flex-wrap: wrap;
-    padding-bottom: 26px; border-bottom: 1px solid var(--line); }
-  .eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--dim2); margin-bottom: 8px; }
-  .figure { font-size: 44px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
-  .under { font-size: 13px; color: var(--dim); margin-top: 8px; line-height: 1.5; }
-  .vrule { width: 1px; align-self: stretch; background: var(--line); }
-  section { padding: 28px 0 4px; }
-  section h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
-  section p.sub { margin: 0 0 18px; font-size: 13px; color: var(--dim); }
-  h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
-  p.lede { margin: 0 0 18px; font-size: 13px; color: var(--dim); }
-
-  .stack { display: flex; height: 38px; border-radius: 8px; overflow: hidden;
+  .hero { display: grid; grid-template-columns: 1fr 1px 1fr auto; align-items: end;
+    gap: 32px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+  .figure { font-size: 40px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+  .under { font-size: 13px; color: var(--dim); margin-top: 8px; }
+  .vrule { align-self: stretch; background: var(--line); }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .tile { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r);
+    background: var(--card); text-align: left; cursor: pointer; color: var(--ink); }
+  .tile:hover { border-color: oklch(0.78 0.02 80); }
+  .tile .v { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+  .tile .k { font-size: 12.5px; color: var(--dim); margin-top: 2px; }
+  .stack { display: flex; height: 36px; border-radius: 8px; overflow: hidden;
     border: 1px solid var(--line); }
   .stack div { display: flex; align-items: center; justify-content: center;
     font-size: 11px; font-family: var(--mono); color: oklch(0.3 0.02 70); overflow: hidden; }
-  .legend { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 14px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 12px; }
   .legend .item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-  .legend .key { width: 9px; height: 9px; border-radius: 2px; display: inline-block; flex: none; }
-  .legend .name { color: var(--ink2); }
+  .legend .key { width: 9px; height: 9px; border-radius: 2px; flex: none; }
   .legend .val { font-family: var(--mono); font-size: 12px; color: var(--dim); }
-  .sechead { display: flex; align-items: baseline; justify-content: space-between;
-    margin-bottom: 14px; gap: 16px; }
 
-  /* ---------- sender table ---------- */
-  .tbl { border: 1px solid var(--line); border-radius: 11px; overflow-x: auto;
+  /* ---------- tables ---------- */
+  .tbl { border: 1px solid var(--line); border-radius: var(--r); overflow-x: auto;
     background: var(--card); }
-  .tbl .head, .tbl .row { display: grid; align-items: center; min-width: 740px; }
-  .tbl .head { padding: 9px 16px; background: var(--raised);
-    border-bottom: 1px solid var(--line); font-size: 11px; text-transform: uppercase;
-    letter-spacing: 0.07em; color: oklch(0.52 0.012 60); }
-  .tbl .row { padding: 0 16px; height: 38px; border-bottom: 1px solid var(--hair);
-    font-size: 13px; cursor: pointer; }
+  .tbl .head, .tbl .row { display: grid; align-items: center; column-gap: 16px;
+    padding: 0 16px; min-width: 680px; }
+  .tbl .head { height: 36px; background: var(--raised); border-bottom: 1px solid var(--line);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--dim); }
+  .tbl .row { min-height: 42px; border-bottom: 1px solid var(--hair); font-size: 13px; }
+  .tbl .row.click { cursor: pointer; }
   .tbl .row:last-child { border-bottom: 0; }
-  .tbl .row:hover { background: oklch(0.965 0.014 82); }
+  .tbl .row.click:hover { background: oklch(0.965 0.014 82); }
   .tbl .row.on { background: oklch(0.965 0.022 55); }
-  .tbl .r { text-align: right; }
+  .tbl .cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tbl .c { text-align: center; }
-  .cellsender { min-width: 0; position: relative; padding-right: 14px; }
+  .tbl .wrap { white-space: normal; padding: 8px 0; line-height: 1.4; }
+  .tbl .empty { padding: 28px 16px; font-size: 13px; color: var(--dim); }
+  .cellsender { position: relative; }
   .cellsender .bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%);
     height: 20px; background: var(--bar); border-radius: 3px; }
   .cellsender .txt { position: relative; font-family: var(--mono); font-size: 12.5px;
-    color: oklch(0.26 0.012 60); overflow: hidden; text-overflow: ellipsis;
-    white-space: nowrap; }
-  .box { width: 15px; height: 15px; border-radius: 4px; display: flex;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 6px; }
+  .box { width: 16px; height: 16px; border-radius: 4px; display: flex;
     align-items: center; justify-content: center; font-size: 10px; cursor: pointer;
     background: var(--white); border: 1px solid oklch(0.8 0.014 80); color: transparent; }
   .box.on { background: var(--accent); border-color: var(--accent); color: oklch(0.99 0.005 85); }
-  .prot0 { color: oklch(0.66 0.012 60); }
+  .prot0 { color: var(--dim2); }
   .prot1 { color: var(--green-d); }
-  .empty { padding: 26px 16px; font-size: 13px; color: var(--dim); }
+  .pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px;
+    border-radius: 999px; font-size: 11.5px; border: 1px solid var(--line2);
+    color: var(--dim); background: var(--white); white-space: nowrap; }
+  .pill.accent { border-color: oklch(0.82 0.06 45); color: var(--accent-d); background: var(--accent-l); }
+  .pill.ok { border-color: var(--green-ln); color: var(--green-d); background: var(--green-bg); }
+  .pill.bad { border-color: oklch(0.85 0.06 30); color: var(--bad); background: var(--bad-bg); }
 
-  /* ---------- senders toolbar ---------- */
-  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    margin-bottom: 16px; }
-  .toolbar input { width: 280px; padding: 9px 12px; border: 1px solid oklch(0.88 0.014 80);
-    border-radius: 8px; background: var(--white); font-family: var(--sans);
-    font-size: 13px; color: var(--ink); outline: none; }
+  /* ---------- toolbars ---------- */
+  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar input { width: 260px; height: 34px; padding: 0 12px; border: 1px solid var(--line2);
+    border-radius: 8px; background: var(--white); font-size: 13px; color: var(--ink); outline: none; }
   .toolbar input:focus { border-color: oklch(0.6 0.06 40); }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chip { padding: 8px 13px; border: 1px solid oklch(0.89 0.014 80); border-radius: 8px;
-    font-family: var(--sans); font-size: 13px; cursor: pointer; background: var(--white);
-    color: oklch(0.4 0.012 60); }
+  .chip { height: 34px; padding: 0 12px; border: 1px solid var(--line2); border-radius: 8px;
+    font-size: 13px; cursor: pointer; background: var(--white); color: var(--ink2); }
   .chip.on { border-color: var(--accent); font-weight: 500; background: var(--accent-l);
     color: var(--accent-d); }
-  .notice { margin-top: 14px; display: flex; align-items: center; gap: 10px;
-    padding: 11px 14px; border: 1px solid var(--line); border-radius: 9px;
-    background: var(--panel); font-size: 13px; color: oklch(0.45 0.012 60); flex-wrap: wrap; }
+  .count-label { font-size: 12.5px; color: var(--dim); }
 
   /* ---------- cleanup ---------- */
-  .batches { display: flex; flex-direction: column; gap: 12px; max-width: 900px; }
-  .batch { display: flex; align-items: center; gap: 22px; padding: 18px 20px;
-    border: 1px solid var(--line); border-radius: 11px; background: var(--card);
-    flex-wrap: wrap; }
+  .batches { display: flex; flex-direction: column; gap: 10px; }
+  .batch { display: grid; grid-template-columns: 1fr 100px 100px 130px; align-items: center;
+    gap: 20px; padding: 16px 20px; border: 1px solid var(--line); border-radius: var(--r);
+    background: var(--card); }
   .batch:hover { border-color: oklch(0.78 0.02 80); }
-  .batch .title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
-    margin-bottom: 5px; }
-  .batch .detail { font-size: 13px; color: oklch(0.52 0.012 60); line-height: 1.5; }
-  .batch .big { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
-  .batch .cap { font-size: 12px; color: var(--dim2); }
-  .safe { margin-top: 22px; padding: 18px 20px; border: 1px solid var(--green-ln);
-    border-radius: 11px; background: var(--green-bg); max-width: 900px;
-    display: flex; align-items: center; gap: 16px; }
-  .safe .swatch { width: 9px; height: 9px; }
-  .safe .txt { font-size: 13px; color: oklch(0.32 0.03 150); line-height: 1.5; }
+  .batch .title { font-size: 14.5px; font-weight: 600; margin-bottom: 3px; }
+  .batch .detail { font-size: 13px; color: var(--dim); }
+  .batch .big { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; text-align: right; }
+  .batch .cap { font-size: 12px; color: var(--dim2); text-align: right; }
+  .safe { display: flex; align-items: center; gap: 14px; margin-top: 16px; padding: 14px 18px;
+    border: 1px solid var(--green-ln); border-radius: var(--r); background: var(--green-bg);
+    font-size: 13px; color: oklch(0.32 0.03 150); }
+
+  /* ---------- settings ---------- */
+  .settings { border-top: 1px solid var(--line); }
+  .setrow { display: grid; grid-template-columns: 260px 1fr; gap: 40px;
+    padding: 28px 0; border-bottom: 1px solid var(--line); }
+  .setrow h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+  .setrow .about { font-size: 13px; color: var(--dim); line-height: 1.55; }
+  .setrow .scope { margin-top: 8px; }
+  .stack-v { display: flex; flex-direction: column; gap: 16px; max-width: 560px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field > span { font-size: 12px; font-weight: 500; color: var(--ink2); }
+  .field small { font-size: 12px; color: var(--dim); }
+  .field input, .field select, .form input, .form select {
+    width: 100%; height: 36px; padding: 0 12px; font-size: 13.5px;
+    border: 1px solid var(--line2); border-radius: 8px; background: var(--white); color: var(--ink); }
+  .field input:focus, .field select:focus, .form input:focus, .form select:focus {
+    outline: none; border-color: var(--accent); }
+  .inline { display: flex; gap: 8px; align-items: center; }
+  .inline > .grow { flex: 1; min-width: 0; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; cursor: pointer; }
+  .check input { margin: 2px 0 0; width: 15px; height: 15px; accent-color: var(--accent); flex: none; }
+  .kv { display: grid; grid-template-columns: 120px 1fr; gap: 6px 16px; font-size: 13px; }
+  .kv dt { color: var(--dim); }
+  .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .choice { padding: 12px 14px; border: 1px solid var(--line2); border-radius: var(--r);
+    background: var(--white); text-align: left; cursor: pointer; color: var(--ink); }
+  .choice:hover { border-color: oklch(0.7 0.02 80); }
+  .choice.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset;
+    background: var(--accent-l); }
+  .choice b { display: block; font-size: 13.5px; font-weight: 600; }
+  .choice span { display: block; margin-top: 3px; font-size: 12px; color: var(--dim); line-height: 1.4; }
+  .checks { display: flex; flex-direction: column; border: 1px solid var(--line);
+    border-radius: var(--r); background: var(--card); }
+  .checks .ck { display: grid; grid-template-columns: 22px 170px 1fr; gap: 10px; align-items: baseline;
+    padding: 9px 14px; border-bottom: 1px solid var(--hair); font-size: 13px; }
+  .checks .ck:last-child { border-bottom: 0; }
+  .checks .fix { grid-column: 3; color: var(--up); font-size: 12.5px; }
+  .ok-mark { color: var(--green-d); } .bad-mark { color: var(--bad); } .skip-mark { color: var(--dim2); }
+  .danger-zone { border-color: oklch(0.86 0.05 30); }
 
   /* ---------- selection bar ---------- */
   #selbar { position: fixed; bottom: 20px; left: 0; right: 0; display: flex;
     justify-content: center; pointer-events: none; z-index: 30; }
-  #selbar .inner { display: flex; align-items: center; gap: 18px;
-    padding: 12px 14px 12px 20px; background: var(--dark); border-radius: 12px;
+  #selbar .inner { display: flex; align-items: center; gap: 16px;
+    padding: 10px 12px 10px 18px; background: var(--dark); border-radius: 12px;
     box-shadow: 0 8px 28px oklch(0.24 0.012 60 / 0.28); pointer-events: auto;
     max-width: calc(100vw - 32px); flex-wrap: wrap; }
   #selbar .label { font-size: 13px; color: oklch(0.95 0.006 85); white-space: nowrap; }
-  #selbar .clear { background: none; border: none; padding: 0; font-family: var(--sans);
-    font-size: 13px; color: oklch(0.72 0.012 60); cursor: pointer; }
+  #selbar .clear { background: none; border: none; padding: 0; font-size: 13px;
+    color: oklch(0.72 0.012 60); cursor: pointer; }
   #selbar .acts { display: flex; gap: 8px; }
-  #selbar .acts button { padding: 8px 14px; border: 1px solid oklch(0.38 0.012 60);
-    background: none; border-radius: 8px; font-family: var(--sans); font-size: 13px;
-    color: oklch(0.95 0.006 85); cursor: pointer; }
+  #selbar .acts button { height: 32px; padding: 0 14px; border: 1px solid oklch(0.38 0.012 60);
+    background: none; border-radius: 8px; font-size: 13px; color: oklch(0.95 0.006 85); cursor: pointer; }
   #selbar .acts button:hover { background: oklch(0.28 0.012 60); }
-  #selbar .acts button.danger { padding: 8px 16px; border: none; font-weight: 500;
+  #selbar .acts button.danger { border: none; font-weight: 500;
     background: oklch(0.58 0.15 40); color: oklch(0.99 0.005 85); }
-  #selbar .acts button.danger:hover { background: oklch(0.52 0.15 40); }
 
-  /* ---------- modal ---------- */
+  /* ---------- sheets (modals) ---------- */
   #scrim { position: fixed; inset: 0; background: oklch(0.24 0.012 60 / 0.4); z-index: 40;
-    display: flex; align-items: center; justify-content: center; padding: 40px; }
-  .sheet { width: 840px; max-width: 100%; max-height: 100%; display: flex;
+    display: flex; align-items: center; justify-content: center; padding: 32px; }
+  .sheet { width: 820px; max-width: 100%; max-height: 100%; display: flex;
     flex-direction: column; background: oklch(0.99 0.005 85); border-radius: 14px;
     box-shadow: 0 24px 60px oklch(0.24 0.012 60 / 0.3); overflow: hidden; }
-  .sheet .top { padding: 22px 26px 20px; border-bottom: 1px solid var(--line); }
+  .sheet.narrow { width: 540px; }
+  .sheet .top { padding: 20px 24px 18px; border-bottom: 1px solid var(--line); }
   .sheet .toprow { display: flex; align-items: flex-start; gap: 16px; }
-  .sheet .who { font-family: var(--mono); font-size: 18px; font-weight: 500;
-    letter-spacing: -0.01em; word-break: break-all; }
-  .sheet .x { flex: none; width: 30px; height: 30px; border: 1px solid oklch(0.88 0.014 80);
-    background: var(--white); border-radius: 8px; font-size: 15px; color: oklch(0.5 0.012 60);
+  .sheet .toprow > div { flex: 1; min-width: 0; }
+  .sheet .title { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+  .sheet .title.mono { font-family: var(--mono); font-weight: 500; }
+  .sheet .sub { margin-top: 4px; font-size: 13px; color: var(--dim); }
+  .sheet .x { flex: none; width: 30px; height: 30px; border: 1px solid var(--line2);
+    background: var(--white); border-radius: 8px; font-size: 14px; color: var(--dim);
     cursor: pointer; line-height: 1; }
-  .sheet .x:hover { border-color: oklch(0.7 0.02 80); }
-  .sheet .stats { display: flex; gap: 36px; margin-top: 20px; flex-wrap: wrap; }
-  .sheet .stats .v { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
-  .sheet .stats .k { font-size: 12px; color: oklch(0.56 0.012 60); margin-top: 3px; }
-  .sheet .body { overflow-y: auto; padding: 22px 26px 26px; }
-  .sheet h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.08em; color: oklch(0.5 0.012 60); }
-  .sheet h3 + * + h3 { margin-top: 28px; }
-  .catrow { display: flex; align-items: center; gap: 14px; margin-bottom: 9px; }
-  .catrow .n { width: 96px; flex: none; font-size: 13px; color: var(--ink2); }
-  .catrow .track { flex: 1; height: 22px; background: oklch(0.945 0.01 82);
-    border-radius: 4px; overflow: hidden; }
+  .sheet .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 18px; }
+  .sheet .stats .v { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  .sheet .stats .k { font-size: 12px; color: var(--dim); margin-top: 2px; }
+  .sheet .body { overflow-y: auto; padding: 20px 24px 24px; }
+  .sheet h3 { margin: 0 0 10px; font-size: 11.5px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--dim); }
+  .sheet .body > * + h3 { margin-top: 24px; }
+  .sheet .foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 12px 24px; border-top: 1px solid var(--line); background: oklch(0.975 0.008 85); }
+  .sheet .foot .msg { flex: 1; min-width: 200px; font-size: 13px; color: var(--dim); }
+  .catrow { display: grid; grid-template-columns: 110px 1fr 56px 120px; align-items: center;
+    gap: 14px; margin-bottom: 8px; font-size: 13px; }
+  .catrow .track { height: 20px; background: oklch(0.945 0.01 82); border-radius: 4px; overflow: hidden; }
   .catrow .fill { height: 100%; border-radius: 4px; }
-  .catrow .c { width: 52px; flex: none; text-align: right; font-family: var(--mono);
-    font-size: 13px; }
-  .catrow .p { width: 116px; flex: none; text-align: right; font-size: 12px; }
-  .subjects { display: flex; flex-direction: column; border: 1px solid oklch(0.91 0.012 80);
-    border-radius: 9px; overflow: hidden; }
-  .subjects .s { display: flex; gap: 16px; padding: 11px 14px;
-    border-bottom: 1px solid var(--hair); background: var(--card); }
+  .catrow .c { text-align: right; font-family: var(--mono); }
+  .catrow .p { text-align: right; font-size: 12px; }
+  .subjects { border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .subjects .s { display: flex; gap: 16px; padding: 10px 14px;
+    border-bottom: 1px solid var(--hair); background: var(--card); font-size: 13px; }
   .subjects .s:last-child { border-bottom: 0; }
-  .subjects .t { flex: 1; font-size: 13px; color: oklch(0.28 0.012 60);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .subjects .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .subjects .w { flex: none; font-size: 12px; color: var(--dim2); }
-  .sheet .foot { padding: 14px 26px; border-top: 1px solid var(--line);
-    background: oklch(0.975 0.008 85); display: flex; align-items: center; gap: 14px;
-    flex-wrap: wrap; }
-  .sheet .foot .msg { flex: 1; font-size: 13px; color: oklch(0.5 0.012 60); min-width: 200px; }
-  code { background: oklch(0.945 0.012 82); padding: 1px 5px; border-radius: 4px;
-    border: 1px solid var(--line); font-family: var(--mono); font-size: 12px; }
-
-  #toast { position: fixed; right: 20px; bottom: 20px; z-index: 60; background: var(--dark);
-    color: oklch(0.95 0.006 85); border-radius: 10px; padding: 11px 16px; font-size: 13px;
-    box-shadow: 0 8px 28px oklch(0.24 0.012 60 / 0.28); display: none; max-width: 420px; }
-  #toast.bad { background: oklch(0.42 0.14 30); }
-  .err { color: oklch(0.48 0.15 30); }
-
-  /* Add-mailbox form. */
-  .plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .form { display: grid; gap: 14px; }
+  .form .fl { display: block; font-size: 12px; font-weight: 500; color: var(--ink2); margin-bottom: 6px; }
+  .plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
   .plist button { text-align: left; padding: 12px 14px; border: 1px solid var(--line2);
-    background: var(--white); border-radius: 10px; cursor: pointer; font: inherit; color: var(--ink); }
+    background: var(--white); border-radius: var(--r); cursor: pointer; color: var(--ink); }
   .plist button:hover { border-color: var(--accent); }
   .plist .pn { font-weight: 600; font-size: 14px; }
-  .plist .pd { font-size: 12px; color: var(--dim); margin-top: 3px; line-height: 1.4; }
-  .form { display: grid; gap: 15px; }
-  .form .fl { display: block; font-size: 11px; text-transform: uppercase;
-    letter-spacing: 0.05em; color: var(--dim); margin-bottom: 6px; }
-  .form input, .form select { width: 100%; padding: 9px 12px; font: inherit; font-size: 14px;
-    border: 1px solid var(--line2); border-radius: 8px; background: var(--white); color: var(--ink); }
-  .form input:focus, .form select:focus { outline: none; border-color: var(--accent); }
-  .form .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .plist .pd { font-size: 12px; color: var(--dim); margin-top: 3px; }
   .steps { white-space: pre-wrap; font-size: 13px; line-height: 1.6; color: var(--ink2);
-    background: var(--raised); border: 1px solid var(--hair); border-radius: 10px; padding: 14px 16px; }
-  .steps a { color: var(--accent); }
+    background: var(--raised); border: 1px solid var(--hair); border-radius: var(--r); padding: 14px 16px; }
   .devcode { font-family: var(--mono); font-size: 30px; font-weight: 500; letter-spacing: 0.14em;
     padding: 16px 0; text-align: center; }
-  .empty { max-width: 560px; margin: 60px auto; text-align: center; }
+
+  .onboard { max-width: 520px; margin: 72px auto; text-align: center; }
+  .onboard .mark { display: block; margin: 0 auto 22px; }
+  .onboard h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 10px; }
+  .onboard p { color: var(--dim); margin: 0 0 26px; line-height: 1.55; }
+  .onboard .facts { display: flex; justify-content: center; gap: 18px; margin-top: 28px;
+    font-size: 12.5px; color: var(--dim2); }
+
+  #toast { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: none;
+    align-items: center; gap: 14px; max-width: 460px; padding: 11px 14px 11px 16px;
+    background: var(--dark); color: oklch(0.95 0.006 85); border-radius: 10px;
+    font-size: 13px; box-shadow: 0 8px 28px oklch(0.24 0.012 60 / 0.28); }
+  #toast.bad { background: oklch(0.42 0.14 30); }
+  #toast button { flex: none; height: 28px; padding: 0 10px; border-radius: 7px; cursor: pointer;
+    border: 1px solid oklch(0.5 0.012 60); background: none; color: inherit; font-size: 12.5px; }
+
+  @media (max-width: 960px) {
+    .brand { width: auto; } .brand .name { display: none; }
+    #synced { display: none; }
+    nav { display: none; }
+    main { padding: 20px 16px 120px; }
+    .hero { grid-template-columns: 1fr; gap: 20px; } .vrule { display: none; }
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .setrow { grid-template-columns: 1fr; gap: 14px; }
+    .batch { grid-template-columns: 1fr 1fr; }
+    .choices { grid-template-columns: 1fr; }
+    #mobile-nav { display: flex !important; }
+  }
+  #mobile-nav { display: none; gap: 6px; overflow-x: auto; padding: 10px 16px;
+    border-bottom: 1px solid var(--line); background: var(--panel); }
+  #mobile-nav button { flex: none; height: 30px; padding: 0 10px; border-radius: 7px;
+    border: 1px solid var(--line2); background: var(--white); font-size: 12.5px; cursor: pointer; }
+  #mobile-nav button.on { border-color: var(--accent); color: var(--accent-d); background: var(--accent-l); }
 </style>
 
 <header>
-  <div class="brand">
-    <svg class="mark" viewBox="0 0 28 28" width="26" height="26" aria-hidden="true">
-      <rect width="28" height="28" rx="8" fill="var(--accent)"/>
-      <path d="M7.5 10.25h13v8a1.25 1.25 0 0 1-1.25 1.25h-10.5A1.25 1.25 0 0 1 7.5 18.25z"
-            fill="none" stroke="#fff" stroke-width="1.5"/>
-      <path d="M7.5 10.6 14 15.4l6.5-4.8" fill="none" stroke="#fff" stroke-width="1.5"
-            stroke-linecap="round" stroke-linejoin="round"/>
+  <a class="brand" href="#" aria-label="mailcleaner, overview">
+    <svg class="mark" viewBox="0 0 64 64" width="28" height="28" aria-hidden="true">
+      <rect width="64" height="64" rx="15" fill="var(--accent)"/>
+      <g transform="translate(0 2.5)" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M48 31v11a3.5 3.5 0 0 1-3.5 3.5h-27A3.5 3.5 0 0 1 14 42V23.5A3.5 3.5 0 0 1 17.5 20H40.5"/><path d="M16 22.5l10.5 8.75L49.5 13"/></g>
     </svg>
-    <b>mclean</b>
-  </div>
+    <span class="name">mailcleaner</span>
+  </a>
   <div class="acct">
-    <button id="acct-btn" class="acct-btn" aria-haspopup="menu" aria-expanded="false">
-      <span class="dot"></span>
-      <span class="who">—</span>
-      <svg class="caret" viewBox="0 0 10 6" width="10" height="6" aria-hidden="true">
-        <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.4"
-              stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </button>
+    <button id="acct-btn" class="acct-btn" aria-haspopup="menu" aria-expanded="false"></button>
     <div id="acct-menu" class="menu" role="menu" hidden></div>
   </div>
-  <div class="seg">
-    <button id="seg-ro">Read-only</button>
-    <button id="seg-on">Actions on</button>
-  </div>
+  <form id="ask" autocomplete="off" role="search">
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5"
+      fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3.5 3.5"
+      stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <input name="q" placeholder="Ask: unread newsletters older than a year"
+           aria-label="Find mail by describing it">
+  </form>
   <div class="spacer"></div>
-  <span class="headstat num" id="headstat"></span>
-  <button class="btn" id="btn-sync">Sync</button>
+  <button id="mode" class="mode" title="Whether this mailbox can be changed"><i></i><span>Read-only</span></button>
+  <div class="syncbox">
+    <span id="synced"></span>
+    <button class="btn" id="btn-sync">Sync</button>
+  </div>
 </header>
+<div id="mobile-nav"></div>
 
 <div class="shell">
   <nav id="nav"></nav>
@@ -367,12 +460,30 @@ async function api(path, body) {
   return data;
 }
 
+/* Downloads go through fetch so the token stays in a header, not a URL. */
+async function download(query) {
+  const res = await fetch('/api/export?' + new URLSearchParams(query),
+                          { headers: { 'X-Token': TOKEN } });
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    return toast(d.error || 'Export failed', true);
+  }
+  const name = (res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/);
+  const url = URL.createObjectURL(await res.blob());
+  const a = el('a', { href: url, download: name ? name[1] : 'export.csv' });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
 /* ---------- helpers ---------- */
 const $ = (s) => document.querySelector(s);
 function el(tag, props = {}, kids = []) {
   const n = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
     if (k === 'style' && typeof v === 'string') n.setAttribute('style', v);
+    else if (k === 'dataset') Object.assign(n.dataset, v);
     else n[k] = v;
   }
   for (const c of [].concat(kids)) if (c != null && c !== false) n.append(c);
@@ -390,22 +501,46 @@ function size(n) {
 function ago(ts) {
   if (!ts) return '—';
   const d = (Date.now() / 1000 - ts) / 86400;
-  if (d < 1) return 'today';
+  if (d < 1 / 24) return 'just now';
+  if (d < 1) return `${Math.max(1, (d * 24) | 0)}h ago`;
   if (d < 2) return 'yesterday';
-  if (d < 30) return `${d | 0}d`;
-  if (d < 365) return `${(d / 30) | 0}mo`;
-  return `${(d / 365).toFixed(1)}y`;
+  if (d < 30) return `${d | 0}d ago`;
+  if (d < 365) return `${(d / 30) | 0}mo ago`;
+  return `${(d / 365).toFixed(1)}y ago`;
 }
 const when = (ts) => (ts ? new Date(ts * 1000).toLocaleString() : '—');
+const plural = (n, w) => `${num(n)} ${w}${n === 1 ? '' : 's'}`;
 
 let toastTimer;
-function toast(msg, bad) {
+function toast(msg, bad, action) {
   const t = $('#toast');
-  t.textContent = msg;
+  t.textContent = '';
+  t.append(el('span', { textContent: msg }));
+  if (action) t.append(el('button', { textContent: action.label,
+    onclick: () => { t.style.display = 'none'; action.run(); } }));
   t.className = bad ? 'bad' : '';
-  t.style.display = 'block';
+  t.style.display = 'flex';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.style.display = 'none'), 5000);
+  toastTimer = setTimeout(() => (t.style.display = 'none'), action ? 9000 : 5000);
+}
+
+/* Every page opens with the same header. */
+function pageHead(title, lede, actions) {
+  return el('div', { className: 'pagehead' }, [
+    el('div', {}, [el('h1', { textContent: title }),
+                   lede ? el('p', { className: 'lede', textContent: lede }) : null]),
+    actions ? el('div', { className: 'btns' }, actions) : null,
+  ]);
+}
+function secHead(title, sub, actions) {
+  return el('div', { className: 'sechead' }, [
+    el('div', {}, [el('h2', { textContent: title }),
+                   sub ? el('p', { textContent: sub }) : null]),
+    actions ? el('div', { className: 'btns' }, actions) : null,
+  ]);
+}
+function button(label, run, cls = '') {
+  return el('button', { className: 'btn ' + cls, textContent: label, onclick: run });
 }
 
 /* ---------- state ---------- */
@@ -427,18 +562,17 @@ const DOMAIN_COLORS = [
   'oklch(0.85 0.05 130)', 'oklch(0.87 0.04 160)', 'oklch(0.89 0.03 190)',
 ];
 const OTHER_COLOR = 'oklch(0.93 0.012 82)';
-
 const TREND = {
-  up:    { label: '↑ rising',  color: 'var(--up)' },
-  new:   { label: '↑ new',     color: 'var(--up)' },
-  down:  { label: '↓ falling', color: 'var(--green)' },
-  flat:  { label: '→ flat',    color: 'var(--dim2)' },
-  '-':   { label: 'dormant',   color: 'oklch(0.62 0.012 60)' },
+  up:   { label: '↑ rising',  color: 'var(--up)' },
+  new:  { label: '↑ new',     color: 'var(--up)' },
+  down: { label: '↓ falling', color: 'var(--green)' },
+  flat: { label: '→ flat',    color: 'var(--dim2)' },
+  '-':  { label: 'dormant',   color: 'var(--dim2)' },
 };
 
-/* Actions the server will actually accept. There is no unsubscribe and no
-   permanent delete anywhere in this tool; trash is the provider's own, and
-   reversible. */
+/* Bulk actions the server will actually accept. There is no permanent delete
+   anywhere in this tool; trash is the provider's own, and reversible.
+   Unsubscribing is separate: it touches no mail, and has its own view. */
 const ACTIONS = [
   { id: 'mark_read', label: 'Mark read' },
   { id: 'archive',   label: 'Archive' },
@@ -446,68 +580,67 @@ const ACTIONS = [
     title: 'Moves to your provider\'s Trash — recoverable there, and undoable from History' },
 ];
 
-/* ---------- sender table ---------- */
-const COLS = 'minmax(200px,1fr) 66px 66px 60px 74px 78px 58px 92px';
+function needActions() {
+  toast('This mailbox is read-only. Turn on actions to make changes.', false,
+        { label: 'Settings', run: () => go('settings', { anchor: 'set-actions' }) });
+}
 
-function senderTable(rows, { selectable = false, max = 0, bars = true } = {}) {
-  const cols = (selectable ? '26px ' : '') + COLS;
+/* ---------- generic table ----------
+   cols: { label, w, r (right-align), key | fmt(row) -> text | node(row) -> Element } */
+function table(cols, rows, { onClick, empty = 'Nothing here.', rowClass } = {}) {
+  const grid = cols.map((c) => c.w || '1fr').join(' ');
   const wrap = el('div', { className: 'tbl' });
-  const head = el('div', { className: 'head', style: `grid-template-columns:${cols}` });
-  if (selectable) head.append(el('div'));
-  head.append(el('div', { textContent: 'Sender' }));
-  [['Emails', 'r'], ['Unread', 'r'], ['/Week', 'r'], ['Trend', 'c'],
-   ['Size', 'r'], ['Last', 'r'], ['Protected', 'r']]
-    .forEach(([t, c]) => head.append(el('div', { className: c, textContent: t })));
-  wrap.append(head);
-
-  const peak = max || Math.max(1, ...rows.map((r) => r.emails || 0));
-
+  wrap.append(el('div', { className: 'head', style: `grid-template-columns:${grid}` },
+    cols.map((c) => el('div', { className: 'cell' + (c.r ? ' r' : c.c ? ' c' : ''),
+                                textContent: c.label }))));
   for (const r of rows) {
-    const on = S.selected.has(r.key);
-    const row = el('div', {
-      className: 'row' + (on ? ' on' : ''),
-      style: `grid-template-columns:${cols}`,
-      title: 'Open sender',
-    });
-    row.onclick = () => openSender(r.key);
-
-    if (selectable) {
-      const box = el('span', { className: 'box' + (on ? ' on' : ''), textContent: '✓' });
-      const cell = el('div', { style: 'display:flex; align-items:center' }, box);
-      cell.onclick = (e) => { e.stopPropagation(); toggle(r.key); };
+    const row = el('div', { className: 'row' + (onClick ? ' click' : '') +
+                                       (rowClass ? ' ' + rowClass(r) : ''),
+                            style: `grid-template-columns:${grid}` });
+    if (onClick) row.onclick = () => onClick(r);
+    for (const c of cols) {
+      const cell = el('div', { className: 'cell' + (c.r ? ' r num' : c.c ? ' c' : '') +
+                                          (c.cls ? ' ' + c.cls(r) : '') + (c.wrap ? ' wrap' : '') });
+      if (c.node) cell.append(c.node(r));
+      else cell.textContent = c.fmt ? c.fmt(r) : (r[c.key] ?? '');
+      if (c.title) cell.title = c.title(r);
       row.append(cell);
     }
-
-    const s = el('div', { className: 'cellsender' });
-    if (bars) {
-      const w = Math.max(4, ((r.emails || 0) / peak) * 100);
-      s.append(el('div', { className: 'bar', style: `width:${w}%` }));
-    }
-    s.append(el('div', { className: 'txt', textContent: r.key || '(unknown)' }));
-    row.append(s);
-
-    const t = TREND[r.trend] || TREND.flat;
-    row.append(el('div', { className: 'r num', style: 'font-weight:500',
-      textContent: num(r.emails) }));
-    row.append(el('div', { className: 'r num', style: 'color:var(--dim)',
-      textContent: num(r.unread) }));
-    row.append(el('div', { className: 'r num', style: 'color:var(--dim)',
-      textContent: (r.per_week || 0).toFixed(1) }));
-    row.append(el('div', { className: 'c',
-      style: `font-size:12px; color:${t.color}`, textContent: t.label }));
-    row.append(el('div', { className: 'r num', style: 'color:var(--dim)',
-      textContent: size(r.bytes) }));
-    row.append(el('div', { className: 'r', style: 'font-size:12.5px; color:var(--dim2)',
-      textContent: ago(r.last_seen) }));
-    row.append(el('div', {
-      className: 'r num ' + (r.protected ? 'prot1' : 'prot0'),
-      style: 'font-size:12.5px',
-      textContent: r.protected ? num(r.protected) : '—',
-    }));
     wrap.append(row);
   }
-  if (!rows.length) wrap.append(el('div', { className: 'empty', textContent: 'Nothing here.' }));
+  if (!rows.length) wrap.append(el('div', { className: 'empty', textContent: empty }));
   return wrap;
+}
+const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
+
+/* ---------- sender table (with volume bars and selection) ---------- */
+function senderTable(rows, { selectable = false, max = 0 } = {}) {
+  const peak = max || Math.max(1, ...rows.map((r) => r.emails || 0));
+  const cols = [];
+  if (selectable) cols.push({ label: '', w: '20px', node: (r) => {
+    const b = el('span', { className: 'box' + (S.selected.has(r.key) ? ' on' : ''), textContent: '✓' });
+    b.onclick = stop(() => toggle(r.key));
+    return b;
+  } });
+  cols.push(
+    { label: 'Sender', w: 'minmax(220px,1fr)', node: (r) => el('div', { className: 'cellsender' }, [
+      el('div', { className: 'bar', style: `width:${Math.max(3, (r.emails || 0) / peak * 100)}%` }),
+      el('div', { className: 'txt', textContent: r.key || '(unknown)' }),
+    ]) },
+    { label: 'Emails', w: '72px', r: true, fmt: (r) => num(r.emails) },
+    { label: 'Unread', w: '72px', r: true, fmt: (r) => num(r.unread) },
+    { label: '/ week', w: '64px', r: true, fmt: (r) => (r.per_week || 0).toFixed(1) },
+    { label: 'Trend', w: '84px', node: (r) => {
+      const t = TREND[r.trend] || TREND.flat;
+      return el('span', { style: `font-size:12.5px; color:${t.color}`, textContent: t.label });
+    } },
+    { label: 'Size', w: '80px', r: true, fmt: (r) => size(r.bytes) },
+    { label: 'Last', w: '84px', r: true, fmt: (r) => ago(r.last_seen) },
+    { label: 'Protected', w: '84px', r: true, fmt: (r) => (r.protected ? num(r.protected) : '—'),
+      cls: (r) => (r.protected ? 'prot1' : 'prot0') },
+  );
+  return table(cols, rows, { onClick: (r) => openSender(r.key),
+    rowClass: (r) => (S.selected.has(r.key) ? 'on' : '') });
 }
 
 function toggle(key) {
@@ -516,47 +649,31 @@ function toggle(key) {
   go(S.tab);
 }
 
-function needActions() {
-  toast('Read-only. Run `mclean enable-actions` in the terminal to allow changes.');
-}
-
 /* ---------- selection bar ---------- */
 function drawSelectionBar() {
   const old = $('#selbar');
   if (old) old.remove();
   if (!S.selected.size || !S.actions) return;
-
   const chosen = S.senders.filter((s) => S.selected.has(s.key));
   const affected = chosen.reduce((a, s) => a + (s.emails - (s.protected || 0)), 0);
   const target = { kind: 'senders', value: [...S.selected] };
-
-  const acts = el('div', { className: 'acts' });
-  for (const a of ACTIONS) {
-    acts.append(el('button', {
-      className: a.danger ? 'danger' : '',
-      textContent: a.label,
-      title: a.title || '',
-      onclick: () => openPreview(target, a.id),
-    }));
-  }
-  const inner = el('div', { className: 'inner' }, [
+  document.body.append(el('div', { id: 'selbar' }, el('div', { className: 'inner' }, [
     el('span', { className: 'label num', textContent:
-      `${S.selected.size} sender${S.selected.size === 1 ? '' : 's'} · ` +
-      `${num(affected)} messages affected` }),
+      `${plural(S.selected.size, 'sender')} · ${num(affected)} messages affected` }),
     el('button', { className: 'clear', textContent: 'Clear',
       onclick: () => { S.selected.clear(); go(S.tab); } }),
-    acts,
-  ]);
-  document.body.append(el('div', { id: 'selbar' }, inner));
+    el('div', { className: 'acts' }, ACTIONS.map((a) => el('button', {
+      className: a.danger ? 'danger' : '', textContent: a.label, title: a.title || '',
+      onclick: () => openPreview(target, a.id) }))),
+  ])));
 }
 
-/* ---------- modal plumbing ---------- */
-function openSheet(build) {
+/* ---------- sheets ---------- */
+function openSheet(build, cls = '') {
   closeSheet();
-  const sheet = el('div', { className: 'sheet' });
+  const sheet = el('div', { className: 'sheet ' + cls });
   sheet.onclick = (e) => e.stopPropagation();
-  const scrim = el('div', { id: 'scrim', onclick: closeSheet }, sheet);
-  $('#mount').append(scrim);
+  $('#mount').append(el('div', { id: 'scrim', onclick: closeSheet }, sheet));
   document.addEventListener('keydown', escClose);
   build(sheet);
   return sheet;
@@ -568,203 +685,167 @@ function closeSheet() {
 }
 function escClose(e) { if (e.key === 'Escape') closeSheet(); }
 
+function sheetTop(eyebrow, title, { mono = false, sub = '' } = {}) {
+  return el('div', { className: 'top' }, el('div', { className: 'toprow' }, [
+    el('div', {}, [
+      eyebrow ? el('div', { className: 'eyebrow', textContent: eyebrow }) : null,
+      el('div', { className: 'title' + (mono ? ' mono' : ''), textContent: title }),
+      sub ? el('div', { className: 'sub', textContent: sub }) : null,
+    ]),
+    el('button', { className: 'x', textContent: '✕', 'aria-label': 'Close', onclick: closeSheet }),
+  ]));
+}
+function sheetError(sheet, message) {
+  sheet.textContent = '';
+  sheet.append(el('div', { className: 'body' }, el('p', { className: 'err', textContent: message })));
+  sheet.append(el('div', { className: 'foot' }, [el('span', { className: 'msg' }),
+    button('Close', closeSheet, 'quiet')]));
+}
+function statRow(items) {
+  return el('div', { className: 'stats' }, items.map(([v, k, st]) => el('div', {}, [
+    el('div', { className: 'v num', style: st || '', textContent: v }),
+    el('div', { className: 'k', textContent: k }),
+  ])));
+}
+function catBars(cats) {
+  const peak = Math.max(1, ...cats.map((c) => c.emails));
+  return el('div', {}, cats.slice(0, 8).map((c) => el('div', { className: 'catrow' }, [
+    el('div', { textContent: c.key || '(none)' }),
+    el('div', { className: 'track' }, el('div', { className: 'fill',
+      style: `width:${(c.emails / peak * 100).toFixed(1)}%; background:` +
+             (c.protected === c.emails ? 'oklch(0.78 0.06 150)' : 'oklch(0.82 0.07 55)') })),
+    el('div', { className: 'c num', textContent: num(c.emails) }),
+    el('div', { className: 'p ' + (c.protected ? 'prot1' : 'prot0'),
+      textContent: c.protected ? `${num(c.protected)} protected` : 'none protected' }),
+  ])));
+}
+
+/* A confirmation that lives in the page, never a browser dialog. */
+function confirmSheet({ title, body, confirm, danger = false, run }) {
+  openSheet((sheet) => {
+    sheet.append(sheetTop('', title));
+    sheet.append(el('div', { className: 'body' }, [].concat(body).map((t) =>
+      typeof t === 'string' ? el('p', { style: 'margin:0 0 10px', textContent: t }) : t)));
+    const msg = el('span', { className: 'msg' });
+    const ok = el('button', { className: 'btn ' + (danger ? 'danger' : 'primary'), textContent: confirm });
+    ok.onclick = async () => {
+      ok.disabled = true;
+      try { await run(); closeSheet(); }
+      catch (e) { msg.textContent = e.message; msg.className = 'msg err'; ok.disabled = false; }
+    };
+    sheet.append(el('div', { className: 'foot' }, [msg, button('Cancel', closeSheet, 'quiet'), ok]));
+  }, 'narrow');
+}
+
 /* ---------- sender detail ---------- */
 async function openSender(email) {
-  const sheet = openSheet((s) => s.append(
-    el('div', { className: 'body', textContent: 'Loading…' })));
+  const sheet = openSheet((s) => s.append(el('div', { className: 'body loading', textContent: 'Loading…' })));
   let d;
-  try {
-    d = await api('sender?value=' + encodeURIComponent(email));
-  } catch (e) {
-    sheet.textContent = '';
-    sheet.append(el('div', { className: 'body' },
-      el('p', { className: 'err', textContent: e.message })));
-    sheet.append(el('div', { className: 'foot' },
-      el('button', { className: 'btn quiet', textContent: 'Close', onclick: closeSheet })));
-    return;
-  }
-
+  try { d = await api('sender?value=' + encodeURIComponent(email)); }
+  catch (e) { return sheetError(sheet, e.message); }
   const r = d.row;
   const eligible = r.emails - (r.protected || 0);
   sheet.textContent = '';
-
-  /* header: who, and the four numbers that decide whether to act */
-  const top = el('div', { className: 'top' });
-  top.append(el('div', { className: 'toprow' }, [
-    el('div', { style: 'flex:1; min-width:0' }, [
-      el('div', { className: 'eyebrow', textContent: 'Sender' }),
-      el('div', { className: 'who', textContent: r.key }),
-    ]),
-    el('button', { className: 'x', textContent: '✕', onclick: closeSheet }),
-  ]));
-  const stats = el('div', { className: 'stats' });
-  [[num(r.emails), 'messages', ''], [size(r.bytes), 'total size', ''],
-   [(r.per_week || 0).toFixed(1), 'per week', ''],
-   [num(r.protected), 'protected · excluded', 'color:var(--green-d)']]
-    .forEach(([v, k, st]) => stats.append(el('div', {}, [
-      el('div', { className: 'v num', style: st, textContent: v }),
-      el('div', { className: 'k', textContent: k }),
-    ])));
-  top.append(stats);
+  const top = sheetTop('Sender', r.key, { mono: true });
+  top.append(statRow([[num(r.emails), 'messages'], [size(r.bytes), 'total size'],
+    [(r.per_week || 0).toFixed(1), 'per week'],
+    [num(r.protected), 'protected · excluded', 'color:var(--green-d)']]));
   sheet.append(top);
 
-  /* body: what it sends, and what it looks like */
   const body = el('div', { className: 'body' });
-  const cats = d.categories || [];
-  const peak = Math.max(1, ...cats.map((c) => c.emails));
   body.append(el('h3', { textContent: 'What it sends' }));
-  const list = el('div', { style: 'margin-bottom:28px' });
-  for (const c of cats) {
-    const allProt = c.protected === c.emails;
-    list.append(el('div', { className: 'catrow' }, [
-      el('div', { className: 'n', textContent: c.key || '(none)' }),
-      el('div', { className: 'track' }, el('div', {
-        className: 'fill',
-        style: `width:${(c.emails / peak * 100).toFixed(1)}%; background:` +
-               (allProt ? 'oklch(0.78 0.06 150)' : 'oklch(0.82 0.07 55)'),
-      })),
-      el('div', { className: 'c num', textContent: num(c.emails) }),
-      el('div', { className: 'p num',
-        style: `color:${c.protected ? 'var(--green-d)' : 'oklch(0.6 0.012 60)'}`,
-        textContent: c.protected ? `${num(c.protected)} protected` : 'none protected' }),
-    ]));
-  }
-  if (!cats.length) list.append(el('div', { className: 'empty', textContent: 'No mail.' }));
-  body.append(list);
-
+  body.append(d.categories.length ? catBars(d.categories)
+    : el('p', { className: 'dim', textContent: 'No mail.' }));
   body.append(el('h3', { textContent: 'Recent subjects' }));
-  const subs = el('div', { className: 'subjects' });
-  for (const m of d.samples || []) {
-    subs.append(el('div', { className: 's' }, [
+  body.append(el('div', { className: 'subjects' }, (d.samples || []).map((m) =>
+    el('div', { className: 's' }, [
       el('div', { className: 't', textContent: m.subject || '(no subject)' }),
       el('div', { className: 'w num', textContent: ago(m.received_at) }),
-    ]));
-  }
-  if (!(d.samples || []).length) {
-    subs.append(el('div', { className: 'empty', textContent: 'Nothing to show.' }));
-  }
-  body.append(subs);
+    ]))));
+
+  const addRule = async (action) => {
+    try {
+      await api('rules/simple/add', { match_type: 'sender', value: r.key, action });
+      toast(`${action === 'protect' ? 'Protected' : 'Ignoring'} ${r.key}.`);
+      S.overview = null;
+      await refreshHeader();
+      openSender(r.key);
+    } catch (e) { toast(e.message, true); }
+  };
+  body.append(el('h3', { textContent: 'Rules' }));
+  body.append(el('div', { className: 'btns' }, [
+    el('button', { className: 'btn', textContent: 'Always protect',
+      title: 'Never include this sender in a bulk action', onclick: () => addRule('protect') }),
+    el('button', { className: 'btn', textContent: 'Treat as clutter',
+      title: 'Everything from them becomes a cleanup candidate', onclick: () => addRule('ignore') }),
+    d.unsubscribe ? el('button', { className: 'btn', textContent: 'Unsubscribe…',
+      onclick: () => openUnsub(r.key, d.unsubscribe) }) : null,
+  ]));
   sheet.append(body);
 
-  /* footer: the only place an action can start from this panel */
   const target = { kind: 'sender', value: r.key };
   const foot = el('div', { className: 'foot' });
-  foot.append(el('span', { className: 'msg', textContent: S.actions
-    ? `${num(eligible)} messages would be affected · ${num(r.protected)} protected and excluded`
-    : 'Read-only. Nothing will be changed.' }));
   if (!S.actions) {
-    foot.append(el('button', { className: 'btn', textContent: 'How to turn on actions',
-      onclick: needActions }));
+    foot.append(el('span', { className: 'msg', textContent: 'Read-only. Nothing will be changed.' }));
+    foot.append(button('Turn on actions', () => { closeSheet(); go('settings', { anchor: 'set-actions' }); }));
   } else {
-    const acts = el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap' });
-    acts.append(el('button', { className: 'btn', textContent: 'Mark read',
-      onclick: () => openPreview(target, 'mark_read') }));
-    acts.append(el('button', { className: 'btn', textContent: 'Archive',
-      onclick: () => openPreview(target, 'archive') }));
-    acts.append(el('button', { className: 'btn primary',
-      textContent: `Trash ${num(eligible)}`,
-      title: 'Moves to your provider\'s Trash — recoverable, and undoable from History',
-      onclick: () => openPreview(target, 'trash') }));
-    foot.append(acts);
+    foot.append(el('span', { className: 'msg', textContent:
+      `${num(eligible)} would be affected · ${num(r.protected)} protected and excluded` }));
+    foot.append(button('Mark read', () => openPreview(target, 'mark_read')));
+    foot.append(button('Archive', () => openPreview(target, 'archive')));
+    foot.append(button(`Trash ${num(eligible)}`, () => openPreview(target, 'trash'), 'primary'));
   }
-  foot.append(el('button', { className: 'btn quiet', textContent: 'Close', onclick: closeSheet }));
   sheet.append(foot);
 }
 
 /* ---------- preview + confirm ---------- */
-async function openPreview(target, preferred) {
-  const sheet = openSheet((s) => s.append(
-    el('div', { className: 'body', textContent: 'Loading preview…' })));
+async function openPreview(target, preferred, opts = {}) {
+  const sheet = openSheet((s) => s.append(el('div', { className: 'body loading', textContent: 'Loading preview…' })));
   let info;
-  try {
-    info = await api('preview', { target });
-  } catch (e) {
-    sheet.textContent = '';
-    sheet.append(el('div', { className: 'body' },
-      el('p', { className: 'err', textContent: e.message })));
-    sheet.append(el('div', { className: 'foot' },
-      el('button', { className: 'btn quiet', textContent: 'Close', onclick: closeSheet })));
-    return;
-  }
+  try { info = await api('preview', { target }); }
+  catch (e) { return sheetError(sheet, e.message); }
   sheet.textContent = '';
-
-  const top = el('div', { className: 'top' });
-  top.append(el('div', { className: 'toprow' }, [
-    el('div', { style: 'flex:1; min-width:0' }, [
-      el('div', { className: 'eyebrow', textContent: 'Selection' }),
-      el('div', { style: 'font-size:18px; font-weight:600; letter-spacing:-0.01em',
-        textContent: info.title }),
-    ]),
-    el('button', { className: 'x', textContent: '✕', onclick: closeSheet }),
-  ]));
-  const stats = el('div', { className: 'stats' });
-  [[num(info.eligible), 'would be affected', ''], [size(info.bytes), 'total size', ''],
-   [num(info.protected), 'protected · excluded', 'color:var(--green-d)'],
-   [info.oldest ? `${ago(info.newest)} – ${ago(info.oldest)}` : '—', 'age range', '']]
-    .forEach(([v, k, st]) => stats.append(el('div', {}, [
-      el('div', { className: 'v num', style: st, textContent: v }),
-      el('div', { className: 'k', textContent: k }),
-    ])));
-  top.append(stats);
+  const top = sheetTop('Selection', info.title);
+  top.append(statRow([[num(info.eligible), 'would be affected'], [size(info.bytes), 'total size'],
+    [num(info.protected), 'protected · excluded', 'color:var(--green-d)'],
+    [info.oldest ? `${ago(info.newest).replace(' ago', '')} – ${ago(info.oldest)}` : '—', 'age range']]));
   sheet.append(top);
 
   const body = el('div', { className: 'body' });
-  const cats = info.categories || [];
-  if (cats.length) {
-    const peak = Math.max(1, ...cats.map((c) => c.emails));
+  if (opts.note) body.append(el('div', { className: 'note-box', style: 'margin-bottom:20px',
+    textContent: opts.note }));
+  if ((info.categories || []).length) {
     body.append(el('h3', { textContent: 'What is in the selection' }));
-    const list = el('div', { style: 'margin-bottom:28px' });
-    for (const c of cats.slice(0, 8)) {
-      list.append(el('div', { className: 'catrow' }, [
-        el('div', { className: 'n', textContent: c.key || '(none)' }),
-        el('div', { className: 'track' }, el('div', { className: 'fill',
-          style: `width:${(c.emails / peak * 100).toFixed(1)}%; background:` +
-                 (c.protected === c.emails ? 'oklch(0.78 0.06 150)' : 'oklch(0.82 0.07 55)') })),
-        el('div', { className: 'c num', textContent: num(c.emails) }),
-        el('div', { className: 'p num',
-          style: `color:${c.protected ? 'var(--green-d)' : 'oklch(0.6 0.012 60)'}`,
-          textContent: c.protected ? `${num(c.protected)} protected` : 'none protected' }),
-      ]));
-    }
-    body.append(list);
+    body.append(catBars(info.categories));
   }
   body.append(el('h3', { textContent: 'Examples' }));
-  const subs = el('div', { className: 'subjects' });
-  for (const m of (info.samples || []).slice(0, 6)) {
-    subs.append(el('div', { className: 's' }, [
-      el('div', { className: 't',
-        textContent: `${m.from_email} — ${m.subject || '(no subject)'}` }),
+  const samples = (info.samples || []).slice(0, 6);
+  body.append(samples.length ? el('div', { className: 'subjects' }, samples.map((m) =>
+    el('div', { className: 's' }, [
+      el('div', { className: 't', textContent: `${m.from_email} — ${m.subject || '(no subject)'}` }),
       el('div', { className: 'w num', textContent: ago(m.received_at) }),
-    ]));
-  }
-  if (!(info.samples || []).length) {
-    subs.append(el('div', { className: 'empty', textContent: 'Nothing eligible.' }));
-  }
-  body.append(subs);
+    ]))) : el('p', { className: 'dim', textContent: 'Nothing eligible.' }));
   sheet.append(body);
 
   const foot = el('div', { className: 'foot' });
+  if (opts.saveFilter) foot.append(button('Save as rule', () => openRuleForm(opts.saveFilter), 'quiet'));
   if (!S.actions) {
-    const msg = el('span', { className: 'msg' });
-    msg.append('Read-only. Run ');
-    msg.append(el('code', { textContent: 'mclean enable-actions' }));
-    msg.append(' in the terminal to allow changes.');
-    foot.append(msg);
+    foot.append(el('span', { className: 'msg', textContent: 'Read-only. Nothing will be changed.' }));
+    foot.append(button('Turn on actions', () => { closeSheet(); go('settings', { anchor: 'set-actions' }); }));
   } else if (!info.eligible) {
-    foot.append(el('span', { className: 'msg',
-      textContent: 'Nothing eligible — everything here is protected.' }));
+    foot.append(el('span', { className: 'msg', textContent: 'Nothing eligible — everything here is protected.' }));
   } else {
-    foot.append(el('span', { className: 'msg',
-      textContent: `${num(info.eligible)} messages · this is reversible from History.` }));
+    foot.append(el('span', { className: 'msg', textContent: 'Reversible from History.' }));
     const run = async (action) => {
       foot.querySelectorAll('button').forEach((b) => (b.disabled = true));
       try {
         const res = await api('action', { action, target });
         toast(`${action.replace('_', ' ')}: ${num(res.count)} messages` +
-              (res.skipped ? `, ${num(res.skipped)} protected skipped` : '') +
-              '. Undo from History.');
+              (res.skipped ? `, ${num(res.skipped)} protected skipped` : '') + '.',
+              false, res.batch_id ? { label: 'Undo', run: () => undo(res.batch_id) } : null);
         closeSheet();
         S.selected.clear();
+        S.overview = null;
         await refreshHeader();
         go(S.tab);
       } catch (e) {
@@ -772,124 +853,112 @@ async function openPreview(target, preferred) {
         foot.querySelectorAll('button').forEach((b) => (b.disabled = false));
       }
     };
-    const acts = el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap' });
+    foot.append(button('Label for review', () => run('label')));
     for (const a of ACTIONS) {
-      acts.append(el('button', {
-        className: 'btn' + (a.id === preferred ? ' primary' : ''),
-        textContent: a.id === preferred ? `${a.label} ${num(info.eligible)}` : a.label,
-        title: a.title || '',
-        onclick: () => run(a.id),
-      }));
+      const b = button(a.id === preferred ? `${a.label} ${num(info.eligible)}` : a.label,
+                       () => run(a.id), a.id === preferred ? 'primary' : '');
+      b.title = a.title || '';
+      foot.append(b);
     }
-    acts.append(el('button', { className: 'btn', textContent: 'Label for review',
-      onclick: () => run('label') }));
-    foot.append(acts);
   }
-  foot.append(el('button', { className: 'btn quiet', textContent: 'Close', onclick: closeSheet }));
+  foot.append(button('Close', closeSheet, 'quiet'));
   sheet.append(foot);
 }
 
-/* ---------- simple table for the secondary views ---------- */
-function plainTable(cols, rows, onClick) {
-  const grid = cols.map((c) => c.w || '1fr').join(' ');
-  const wrap = el('div', { className: 'tbl' });
-  const head = el('div', { className: 'head', style: `grid-template-columns:${grid}` });
-  cols.forEach((c) => head.append(el('div', {
-    className: c.r ? 'r' : '', textContent: c.label })));
-  wrap.append(head);
-  for (const r of rows) {
-    const row = el('div', { className: 'row', style: `grid-template-columns:${grid}` });
-    if (onClick) row.onclick = () => onClick(r); else row.style.cursor = 'default';
-    cols.forEach((c) => row.append(el('div', {
-      className: (c.r ? 'r num ' : '') + (c.cls ? c.cls(r) : ''),
-      style: 'overflow:hidden; text-overflow:ellipsis; white-space:nowrap',
-      textContent: c.fmt ? c.fmt(r) : (r[c.key] ?? ''),
-    })));
-    wrap.append(row);
-  }
-  if (!rows.length) wrap.append(el('div', { className: 'empty', textContent: 'Nothing here.' }));
-  return wrap;
+async function undo(batchId) {
+  try {
+    const res = await api('undo', { batch_id: batchId });
+    toast(`Restored ${num(res.undone)} messages.`);
+    S.overview = null;
+    await refreshHeader();
+    go(S.tab);
+  } catch (e) { toast(e.message, true); }
 }
 
 /* ---------- views ---------- */
 const VIEWS = {};
 
 VIEWS.overview = async (main) => {
-  const d = S.overview || (S.overview = await api('overview'));
+  const [d, w] = await Promise.all([S.overview ? S.overview : api('overview'), api('digest?days=7')]);
+  S.overview = d;
   const s = d.stats;
   S.senders = d.top_senders;
 
-  /* two headline numbers: what you have, and what is safe to lose */
-  const hero = el('div', { className: 'hero' });
-  hero.append(el('div', {}, [
-    el('div', { className: 'eyebrow', textContent: 'Mailbox' }),
-    el('div', { className: 'figure num', textContent: size(s.bytes) }),
-    el('div', { className: 'under num', textContent:
-      `${num(s.total)} messages · ${num(s.senders)} senders · ${num(s.unread)} unread` }),
+  main.append(el('div', { className: 'hero' }, [
+    el('div', {}, [
+      el('div', { className: 'eyebrow', textContent: 'Mailbox' }),
+      el('div', { className: 'figure num', textContent: size(s.bytes) }),
+      el('div', { className: 'under num', textContent:
+        `${num(s.total)} messages · ${num(s.senders)} senders · ${num(s.unread)} unread` }),
+    ]),
+    el('div', { className: 'vrule' }),
+    el('div', {}, [
+      el('div', { className: 'eyebrow', textContent: 'Safe to clean' }),
+      el('div', { className: 'figure num', style: 'color:var(--accent)', textContent: size(s.cleanup_bytes) }),
+      el('div', { className: 'under', textContent:
+        `${num(s.cleanup)} messages from ${num(s.cleanup_senders)} senders. Protected mail excluded.` }),
+    ]),
+    button('Review cleanup', () => go('cleanup'), 'primary big'),
   ]));
-  hero.append(el('div', { className: 'vrule' }));
-  hero.append(el('div', { style: 'max-width:420px' }, [
-    el('div', { className: 'eyebrow', textContent: 'Safe to clean' }),
-    el('div', { className: 'figure num', style: 'color:var(--accent)',
-      textContent: size(s.cleanup_bytes) }),
-    el('div', { className: 'under', style: 'color:oklch(0.42 0.012 60)', textContent:
-      `${num(s.cleanup)} messages from ${num(s.cleanup_senders)} senders. ` +
-      'Protected mail is excluded.' }),
+
+  /* this week */
+  const sec0 = el('section');
+  sec0.append(secHead('This week', `What arrived in the last ${w.days} days.`));
+  const tile = (v, k, run) => el('button', { className: 'tile', onclick: run }, [
+    el('div', { className: 'v num', textContent: v }), el('div', { className: 'k', textContent: k })]);
+  sec0.append(el('div', { className: 'tiles' }, [
+    tile(num(w.new), `new · ${num(w.new_unread)} unread`, () => go('senders')),
+    tile(num(w.action_required + w.potentially_important), 'need attention', () => go('attention')),
+    tile(num(w.alerts.length), w.alerts.length === 1 ? 'sender got louder' : 'senders got louder',
+         () => document.getElementById('louder')?.scrollIntoView({ behavior: 'smooth' })),
+    d.llm_provider === 'off'
+      ? tile('—', 'assistant off', () => go('settings', { anchor: 'set-llm' }))
+      : tile(num(d.pending_suggestions), 'rule suggestions', () => go('assistant')),
   ]));
-  hero.append(el('button', { className: 'btn primary big', textContent: 'Review cleanup',
-    onclick: () => go('cleanup') }));
-  main.append(hero);
+  main.append(sec0);
 
   /* where the volume comes from */
   const doms = d.top_domains.slice(0, 6);
   const shown = doms.reduce((a, x) => a + x.emails, 0);
-  const restCount = Math.max(0, s.total - shown);
-  const restBytes = Math.max(0, (s.bytes || 0) - doms.reduce((a, x) => a + (x.bytes || 0), 0));
-  const restSenders = Math.max(0, s.domains - doms.length);
-  const parts = doms.map((x, i) => ({
-    name: x.key, emails: x.emails, bytes: x.bytes, color: DOMAIN_COLORS[i],
-  }));
-  if (restCount) parts.push({ name: `${num(restSenders)} others`, emails: restCount,
-    bytes: restBytes, color: OTHER_COLOR });
+  const parts = doms.map((x, i) => ({ name: x.key, emails: x.emails, bytes: x.bytes, color: DOMAIN_COLORS[i] }));
+  const rest = Math.max(0, s.total - shown);
+  if (rest) parts.push({ name: `${num(Math.max(0, s.domains - doms.length))} others`, emails: rest,
+    bytes: Math.max(0, (s.bytes || 0) - doms.reduce((a, x) => a + (x.bytes || 0), 0)), color: OTHER_COLOR });
   const total = Math.max(1, parts.reduce((a, x) => a + x.emails, 0));
-
   const sec1 = el('section');
-  sec1.append(el('h2', { textContent: 'Where the volume comes from' }));
-  sec1.append(el('p', { className: 'sub', textContent:
-    `${doms.length} domains account for ${Math.round(shown / Math.max(1, s.total) * 100)}% ` +
-    'of everything in your mailbox.' }));
-  const stack = el('div', { className: 'stack' });
-  for (const p of parts) {
+  sec1.append(secHead('Where the volume comes from',
+    `${doms.length} domains account for ${Math.round(shown / Math.max(1, s.total) * 100)}% of your mailbox.`));
+  sec1.append(el('div', { className: 'stack' }, parts.map((p) => {
     const pct = p.emails / total;
-    stack.append(el('div', {
-      title: `${p.name} — ${num(p.emails)}`,
+    return el('div', { title: `${p.name} — ${num(p.emails)}`,
       style: `width:${(pct * 100).toFixed(2)}%; background:${p.color}`,
-      textContent: pct > 0.06 ? p.name.replace(/\.(com|in|net|org|so|io|co\.in|co\.uk)$/, '') : '',
-    }));
-  }
-  sec1.append(stack);
-  const legend = el('div', { className: 'legend' });
-  for (const p of parts) {
-    legend.append(el('div', { className: 'item' }, [
-      el('span', { className: 'key', style: `background:${p.color}` }),
-      el('span', { className: 'name', textContent: p.name }),
-      el('span', { className: 'val num', textContent: `${num(p.emails)} · ${size(p.bytes)}` }),
-    ]));
-  }
-  sec1.append(legend);
+      textContent: pct > 0.07 ? p.name.replace(/\.(com|in|net|org|so|io|co\.in|co\.uk)$/, '') : '' });
+  })));
+  sec1.append(el('div', { className: 'legend' }, parts.map((p) => el('div', { className: 'item' }, [
+    el('span', { className: 'key', style: `background:${p.color}` }),
+    el('span', { textContent: p.name }),
+    el('span', { className: 'val num', textContent: `${num(p.emails)} · ${size(p.bytes)}` }),
+  ]))));
   main.append(sec1);
 
+  /* who got louder */
+  if ((d.alerts || []).length) {
+    const sa = el('section', { id: 'louder' });
+    sa.append(secHead('Getting louder', 'Senders whose volume jumped in the last 30 days.'));
+    sa.append(table([
+      { label: 'Sender', w: 'minmax(220px,1fr)', node: (a) => el('span', { className: 'mono',
+        style: 'font-size:12.5px', textContent: a.key }) },
+      { label: 'Last 30 days', w: '110px', r: true, fmt: (a) => num(a.d30) },
+      { label: 'Now', w: '90px', r: true, fmt: (a) => `${a.per_week}/wk` },
+      { label: 'Before', w: '90px', r: true, fmt: (a) => (a.kind === 'new' ? 'new' : `${a.older_per_week}/wk`) },
+    ], d.alerts, { onClick: (a) => openSender(a.key) }));
+    main.append(sa);
+  }
+
   /* the loudest senders */
-  const sec2 = el('section', { style: 'padding-top:30px' });
-  sec2.append(el('div', { className: 'sechead' }, [
-    el('div', {}, [
-      el('h2', { textContent: 'The ten loudest senders' }),
-      el('p', { className: 'sub', style: 'margin:0',
-        textContent: 'Click a row to see what it actually sends you.' }),
-    ]),
-    el('button', { className: 'btn link', textContent: `All ${num(s.senders)} senders →`,
-      onclick: () => go('senders') }),
-  ]));
+  const sec2 = el('section');
+  sec2.append(secHead('The ten loudest senders', 'Click a row to see what it actually sends you.',
+    [button(`All ${num(s.senders)} senders →`, () => go('senders'), 'link')]));
   sec2.append(senderTable(d.top_senders, { selectable: S.actions }));
   main.append(sec2);
 };
@@ -905,16 +974,11 @@ VIEWS.senders = async (main) => {
   const d = await api('senders?limit=500');
   S.senders = d.rows;
   const total = S.overview ? S.overview.stats.senders : d.rows.length;
-
-  main.append(el('h1', { textContent: 'Senders' }));
-  main.append(el('p', { className: 'lede', textContent:
-    `${num(total)} senders. Sorted by volume.` }));
+  main.append(pageHead('Senders', `${num(total)} senders, loudest first.`,
+    [button('Export CSV', () => download({ what: 'senders' }))]));
 
   const q = S.query.trim().toLowerCase();
-  const visible = d.rows.filter((r) =>
-    (!q || (r.key || '').toLowerCase().includes(q)) && FILTERS[S.filter](r));
-
-  const bar = el('div', { className: 'toolbar' });
+  const visible = d.rows.filter((r) => (!q || (r.key || '').toLowerCase().includes(q)) && FILTERS[S.filter](r));
   const input = el('input', { value: S.query, placeholder: 'Filter by sender or domain' });
   let debounce;
   input.oninput = () => {
@@ -922,190 +986,773 @@ VIEWS.senders = async (main) => {
     clearTimeout(debounce);
     debounce = setTimeout(() => go('senders', { focus: 'search' }), 160);
   };
-  bar.append(input);
-  const chips = el('div', { className: 'chips' });
-  for (const name of Object.keys(FILTERS)) {
-    chips.append(el('button', {
-      className: 'chip' + (S.filter === name ? ' on' : ''),
-      textContent: name,
-      onclick: () => { S.filter = name; go('senders'); },
-    }));
-  }
-  bar.append(chips);
-  bar.append(el('div', { className: 'spacer' }));
-  bar.append(el('span', { className: 'headstat num',
-    textContent: `${num(visible.length)} of ${num(total)} shown` }));
-  main.append(bar);
-
-  main.append(senderTable(visible, {
-    selectable: S.actions, max: Math.max(1, ...d.rows.map((r) => r.emails || 0)) }));
-
-  if (!S.actions) {
-    const n = el('div', { className: 'notice' });
-    n.append(el('span', { textContent:
-      'Read-only. Turn on actions to select senders and clean them up.' }));
-    n.append(el('button', { className: 'btn link', textContent: 'How',
-      onclick: needActions }));
-    main.append(n);
-  }
+  main.append(el('div', { className: 'toolbar' }, [
+    input,
+    el('div', { className: 'chips' }, Object.keys(FILTERS).map((name) => el('button', {
+      className: 'chip' + (S.filter === name ? ' on' : ''), textContent: name,
+      onclick: () => { S.filter = name; go('senders'); } }))),
+    el('div', { className: 'spacer' }),
+    el('span', { className: 'count-label num', textContent: `${num(visible.length)} shown` }),
+  ]));
+  main.append(senderTable(visible, { selectable: S.actions,
+    max: Math.max(1, ...d.rows.map((r) => r.emails || 0)) }));
+  if (!S.actions) main.append(el('div', { className: 'notice' }, [
+    el('span', { textContent: 'Read-only. Turn on actions to select senders and clean them up.' }),
+    button('Turn on actions', () => go('settings', { anchor: 'set-actions' })),
+  ]));
 };
 
 VIEWS.cleanup = async (main) => {
   const d = await api('suggestions');
-  main.append(el('h1', { textContent: 'Cleanup' }));
-  main.append(el('p', { className: 'lede', style: 'max-width:560px', textContent:
-    `${d.rows.length} batches, ordered by how much they free. Every batch excludes ` +
-    'protected mail — nothing here touches anything you have read or replied to.' }));
-
+  main.append(pageHead('Cleanup',
+    'Ready-made batches, largest first. Every batch excludes protected mail and can be undone.'));
   const rows = d.rows.slice().sort((a, b) => (b.bytes || 0) - (a.bytes || 0));
-  const batches = el('div', { className: 'batches' });
-  for (const r of rows) {
-    batches.append(el('div', { className: 'batch' }, [
-      el('div', { style: 'flex:1; min-width:220px' }, [
-        el('div', { className: 'title', textContent: r.key }),
-        el('div', { className: 'detail', textContent: r.desc }),
-      ]),
-      el('div', { style: 'text-align:right; flex:none; width:96px' }, [
-        el('div', { className: 'big num', textContent: num(r.emails) }),
-        el('div', { className: 'cap', textContent: 'messages' }),
-      ]),
-      el('div', { style: 'text-align:right; flex:none; width:88px' }, [
-        el('div', { className: 'big num', style: 'color:var(--accent)',
-          textContent: size(r.bytes) }),
-        el('div', { className: 'cap', textContent: 'freed' }),
-      ]),
-      el('div', { style: 'flex:none; width:130px; display:flex; justify-content:flex-end' },
-        el('button', {
-          className: 'btn' + (S.actions ? ' primary' : ''),
-          textContent: S.actions ? 'Clean up' : 'Preview',
-          onclick: () => openPreview({ kind: 'suggestion', value: r.index }, 'trash'),
-        })),
-    ]));
-  }
-  main.append(batches);
-
+  main.append(el('div', { className: 'batches' }, rows.map((r) => el('div', { className: 'batch' }, [
+    el('div', {}, [el('div', { className: 'title', textContent: r.key }),
+                   el('div', { className: 'detail', textContent: r.desc })]),
+    el('div', {}, [el('div', { className: 'big num', textContent: num(r.emails) }),
+                   el('div', { className: 'cap', textContent: 'messages' })]),
+    el('div', {}, [el('div', { className: 'big num', style: 'color:var(--accent)', textContent: size(r.bytes) }),
+                   el('div', { className: 'cap', textContent: 'freed' })]),
+    el('div', { className: 'btns', style: 'justify-content:flex-end' },
+      button(S.actions ? 'Clean up' : 'Preview',
+             () => openPreview({ kind: 'suggestion', value: r.index }, 'trash'),
+             S.actions ? 'primary' : '')),
+  ]))));
   const prot = S.overview ? S.overview.stats.protected : 0;
-  main.append(el('div', { className: 'safe' }, [
-    el('span', { className: 'swatch' }),
-    el('div', { className: 'txt' }, [
-      el('strong', { textContent: `${num(prot)} messages stay put.` }),
-      ' Anything you opened, replied to, starred, or flagged as important is ' +
-      'protected and never included in a batch.',
-    ]),
-  ]));
+  main.append(el('div', { className: 'safe' }, [el('span', { className: 'swatch' }),
+    el('span', {}, [el('strong', { textContent: `${num(prot)} messages stay put. ` }),
+      'Finance, security, travel, orders, people you write to and anything starred is never included.'])]));
 };
 
 VIEWS.attention = async (main) => {
   const d = await api('attention?limit=300');
-  main.append(el('h1', { textContent: 'Needs attention' }));
-  main.append(el('p', { className: 'lede',
-    textContent: 'Unread mail the classifier thinks you actually care about.' }));
-  main.append(plainTable([
-    { key: 'attention', label: 'Attention', w: '150px' },
-    { key: 'from_email', label: 'From', w: 'minmax(160px,1fr)' },
-    { key: 'subject', label: 'Subject', w: 'minmax(220px,2fr)',
-      fmt: (r) => r.subject || '(no subject)' },
-    { key: 'category', label: 'Category', w: '110px' },
-    { key: 'received_at', label: 'When', w: '80px', r: true, fmt: (r) => ago(r.received_at) },
-  ], d.rows));
+  main.append(pageHead('Needs attention', 'Unread mail the classifier thinks you actually care about.'));
+  const badge = { 'action required': 'bad', 'potentially important': 'accent', 'read later': '' };
+  main.append(table([
+    { label: 'Attention', w: '170px', node: (r) => el('span', { className: 'pill ' + (badge[r.attention] ?? ''),
+      textContent: r.attention }) },
+    { label: 'From', w: 'minmax(170px,1fr)', key: 'from_email' },
+    { label: 'Subject', w: 'minmax(240px,2fr)', fmt: (r) => r.subject || '(no subject)' },
+    { label: 'Category', w: '110px', key: 'category' },
+    { label: 'When', w: '84px', r: true, fmt: (r) => ago(r.received_at) },
+  ], d.rows, { onClick: (r) => openSender(r.from_email), empty: 'Nothing unread needs you.' }));
 };
 
 VIEWS.domains = async (main) => {
   const d = await api('domains?limit=500');
-  main.append(el('h1', { textContent: 'Domains' }));
-  main.append(el('p', { className: 'lede', textContent: 'Rolled up by sending domain.' }));
-  main.append(plainTable([
-    { key: 'key', label: 'Domain', w: 'minmax(200px,1fr)' },
-    { key: 'emails', label: 'Emails', w: '80px', r: true, fmt: (r) => num(r.emails) },
-    { key: 'unread', label: 'Unread', w: '80px', r: true, fmt: (r) => num(r.unread) },
-    { key: 'per_week', label: '/Week', w: '70px', r: true, fmt: (r) => (r.per_week || 0).toFixed(1) },
-    { key: 'bytes', label: 'Size', w: '86px', r: true, fmt: (r) => size(r.bytes) },
-    { key: 'last_seen', label: 'Last', w: '70px', r: true, fmt: (r) => ago(r.last_seen) },
-    { key: 'protected', label: 'Protected', w: '92px', r: true, fmt: (r) => num(r.protected),
+  main.append(pageHead('Domains', 'Mail rolled up by sending domain. Click one to preview acting on all of it.',
+    [button('Export CSV', () => download({ what: 'domains' }))]));
+  main.append(table([
+    { label: 'Domain', w: 'minmax(200px,1fr)', key: 'key' },
+    { label: 'Emails', w: '80px', r: true, fmt: (r) => num(r.emails) },
+    { label: 'Unread', w: '80px', r: true, fmt: (r) => num(r.unread) },
+    { label: '/ week', w: '70px', r: true, fmt: (r) => (r.per_week || 0).toFixed(1) },
+    { label: 'Size', w: '86px', r: true, fmt: (r) => size(r.bytes) },
+    { label: 'Last', w: '84px', r: true, fmt: (r) => ago(r.last_seen) },
+    { label: 'Protected', w: '90px', r: true, fmt: (r) => (r.protected ? num(r.protected) : '—'),
       cls: (r) => (r.protected ? 'prot1' : 'prot0') },
-  ], d.rows, (r) => openPreview({ kind: 'domain', value: r.key }, 'archive')));
+  ], d.rows, { onClick: (r) => openPreview({ kind: 'domain', value: r.key }, 'archive') }));
 };
 
 VIEWS.categories = async (main) => {
   const d = await api('categories');
-  main.append(el('h1', { textContent: 'Categories' }));
-  main.append(el('p', { className: 'lede', textContent: 'What the classifier made of your mail.' }));
-  main.append(plainTable([
-    { key: 'key', label: 'Category', w: 'minmax(160px,1fr)' },
-    { key: 'emails', label: 'Emails', w: '90px', r: true, fmt: (r) => num(r.emails) },
-    { key: 'unread', label: 'Unread', w: '90px', r: true, fmt: (r) => num(r.unread) },
-    { key: 'bytes', label: 'Size', w: '90px', r: true, fmt: (r) => size(r.bytes) },
-    { key: 'protected', label: 'Protected', w: '96px', r: true, fmt: (r) => num(r.protected),
+  main.append(pageHead('Categories', 'What the classifier made of your mail.'));
+  main.append(table([
+    { label: 'Category', w: 'minmax(160px,1fr)', fmt: (r) => r.key || 'unknown' },
+    { label: 'Emails', w: '90px', r: true, fmt: (r) => num(r.emails) },
+    { label: 'Unread', w: '90px', r: true, fmt: (r) => num(r.unread) },
+    { label: 'Size', w: '90px', r: true, fmt: (r) => size(r.bytes) },
+    { label: 'Protected', w: '96px', r: true, fmt: (r) => (r.protected ? num(r.protected) : '—'),
       cls: (r) => (r.protected ? 'prot1' : 'prot0') },
-    { key: 'last_seen', label: 'Last', w: '80px', r: true, fmt: (r) => ago(r.last_seen) },
-  ], d.rows, (r) => openPreview({ kind: 'category', value: r.key }, 'archive')));
+    { label: 'Last', w: '84px', r: true, fmt: (r) => ago(r.last_seen) },
+  ], d.rows, { onClick: (r) => openPreview({ kind: 'category', value: r.key }, 'archive') }));
 };
 
 VIEWS.ages = async (main) => {
   const d = await api('ages');
   d.rows.forEach((r, i) => (r.index = i));
-  main.append(el('h1', { textContent: 'Age' }));
-  main.append(el('p', { className: 'lede',
-    textContent: 'Click a bucket to preview a bulk action on everything that old.' }));
-  main.append(plainTable([
-    { key: 'key', label: 'Age', w: 'minmax(160px,1fr)' },
-    { key: 'emails', label: 'Emails', w: '90px', r: true, fmt: (r) => num(r.emails) },
-    { key: 'unread', label: 'Unread', w: '90px', r: true, fmt: (r) => num(r.unread) },
-    { key: 'bytes', label: 'Size', w: '90px', r: true, fmt: (r) => size(r.bytes) },
-    { key: 'protected', label: 'Protected', w: '96px', r: true, fmt: (r) => num(r.protected),
+  main.append(pageHead('Age', 'How old your mail is. Click a band to preview acting on all of it.'));
+  main.append(table([
+    { label: 'Age', w: 'minmax(160px,1fr)', key: 'key' },
+    { label: 'Emails', w: '90px', r: true, fmt: (r) => num(r.emails) },
+    { label: 'Unread', w: '90px', r: true, fmt: (r) => num(r.unread) },
+    { label: 'Size', w: '90px', r: true, fmt: (r) => size(r.bytes) },
+    { label: 'Protected', w: '96px', r: true, fmt: (r) => (r.protected ? num(r.protected) : '—'),
       cls: (r) => (r.protected ? 'prot1' : 'prot0') },
-  ], d.rows, (r) => openPreview({ kind: 'age', value: r.index }, 'archive')));
+  ], d.rows, { onClick: (r) => openPreview({ kind: 'age', value: r.index }, 'archive') }));
 };
 
 VIEWS.history = async (main) => {
   const d = await api('history?limit=100');
-  main.append(el('h1', { textContent: 'History' }));
-  main.append(el('p', { className: 'lede',
-    textContent: 'Every batch this tool ran. Click one to put it back.' }));
-  main.append(plainTable([
-    { key: 'ts', label: 'When', w: 'minmax(170px,1fr)', fmt: (r) => when(r.ts) },
-    { key: 'action', label: 'Action', w: '110px' },
-    { key: 'detail', label: 'Detail', w: 'minmax(160px,1fr)' },
-    { key: 'n', label: 'Messages', w: '96px', r: true, fmt: (r) => num(r.n) },
-    { key: 'undone', label: 'Status', w: '90px', fmt: (r) => (r.undone ? 'undone' : 'applied') },
-  ], d.rows, async (r) => {
-    if (r.undone) return toast('Already undone.');
-    try {
-      const res = await api('undo', { batch_id: r.batch_id });
-      toast(`Restored ${num(res.undone)} messages.`);
-      S.overview = null;
-      await refreshHeader();
-      go('history');
-    } catch (e) { toast(e.message, true); }
-  }));
+  main.append(pageHead('History', 'Every batch this app has run. Undo puts it back.'));
+  main.append(table([
+    { label: 'When', w: '190px', fmt: (r) => when(r.ts) },
+    { label: 'Action', w: '110px', fmt: (r) => r.action.replace('_', ' ') },
+    { label: 'Detail', w: 'minmax(140px,1fr)', key: 'detail' },
+    { label: 'Messages', w: '96px', r: true, fmt: (r) => num(r.n) },
+    { label: '', w: '96px', r: true, node: (r) => r.undone
+      ? el('span', { className: 'pill', textContent: 'undone' })
+      : button('Undo', () => undo(r.batch_id), 'sm') },
+  ], d.rows, { empty: 'Nothing has been changed yet.' }));
 };
+
+/* ---------- rules ---------- */
+const CATEGORY_CHOICES = ['', 'newsletter', 'promotion', 'social', 'automated', 'developer',
+  'work', 'orders', 'travel', 'finance', 'security', 'human', 'unknown'];
+const actionText = (r) => r.action.replace('_', ' ') + (r.label ? ` “${r.label}”` : '');
+
+VIEWS.rules = async (main) => {
+  const d = await api('rules');
+  const autos = d.policies.filter((p) => p.auto);
+  const apply = button(`Apply ${plural(autos.length, 'auto rule')}`, async () => {
+    if (!S.actions) return needActions();
+    confirmSheet({
+      title: `Apply ${plural(autos.length, 'auto rule')} now?`,
+      body: autos.map((p) => `${p.name}: ${actionText(p)} ${num(p.matches)} messages`)
+        .concat(['Protected mail is excluded. Each rule runs as its own batch you can undo from History.']),
+      confirm: 'Apply',
+      run: async () => {
+        const r = await api('rules/apply', {});
+        toast(r.results.map((x) => `${x.policy}: ${num(x.count)}`).join(' · ') || 'Nothing matched.');
+        go('rules');
+      },
+    });
+  });
+  main.append(pageHead('Rules',
+    'A rule is a filter plus an action. Rules suggest: open one to preview and act. ' +
+    'Auto rules also run when you apply them, or on the background schedule. ' +
+    'Protected mail is always excluded and trash is never automatic.',
+    [autos.length ? apply : null, button('New rule', () => openRuleForm(), 'primary')]));
+
+  main.append(table([
+    { label: 'Rule', w: 'minmax(150px,1fr)', key: 'name' },
+    { label: 'When', w: 'minmax(220px,2fr)', key: 'summary', title: (r) => r.summary },
+    { label: 'Then', w: '130px', fmt: actionText },
+    { label: 'Mode', w: '80px', node: (r) => el('span', { className: 'pill' + (r.auto ? ' accent' : ''),
+      textContent: r.auto ? 'auto' : 'suggest' }) },
+    { label: 'Matches', w: '80px', r: true, fmt: (r) => num(r.matches) },
+    { label: 'Size', w: '80px', r: true, fmt: (r) => size(r.bytes) },
+  ], d.policies, { onClick: (r) => openPolicy(r), empty: 'No rules yet. New rule, or save one from a search.' }));
+
+  const sec = el('section');
+  sec.append(secHead('Sender overrides',
+    'Set from a sender’s panel. They change how that sender’s mail is classified.'));
+  sec.append(table([
+    { label: 'Override', w: '110px', node: (r) => el('span', { className: 'pill' + (r.action === 'protect' ? ' ok' : ''),
+      textContent: r.action === 'ignore' ? 'clutter' : r.action }) },
+    { label: 'Sender or domain', w: 'minmax(220px,1fr)', node: (r) => el('span', { className: 'mono',
+      style: 'font-size:12.5px', textContent: r.match_value }) },
+    { label: 'Category', w: '110px', fmt: (r) => r.category || '' },
+    { label: 'Added', w: '90px', r: true, fmt: (r) => ago(r.created_at) },
+    { label: '', w: '90px', r: true, node: (r) => button('Remove', async () => {
+      try {
+        await api('rules/simple/remove', { id: r.id });
+        toast(`Removed the override for ${r.match_value}.`);
+        S.overview = null;
+        go('rules');
+      } catch (e) { toast(e.message, true); }
+    }, 'sm') },
+  ], d.rules, { empty: 'None. Use “Always protect” or “Treat as clutter” on a sender.' }));
+  main.append(sec);
+};
+
+function openPolicy(p) {
+  openSheet((sheet) => {
+    sheet.append(sheetTop('Rule', p.name));
+    sheet.append(el('div', { className: 'body' }, [
+      el('dl', { className: 'kv' }, [
+        el('dt', { textContent: 'When' }), el('dd', { textContent: p.summary }),
+        el('dt', { textContent: 'Then' }), el('dd', { textContent: actionText(p) }),
+        el('dt', { textContent: 'Matches now' }), el('dd', { textContent:
+          `${num(p.matches)} messages · ${num(p.protected)} protected and excluded` }),
+        el('dt', { textContent: 'Mode' }), el('dd', { textContent: p.auto
+          ? 'Auto — runs when you apply rules or on the background schedule.'
+          : 'Suggest — nothing happens until you act on the preview.' }),
+      ]),
+    ]));
+    const toggleAuto = async () => {
+      try { await api('rules/auto', { id: p.id, auto: !p.auto }); closeSheet(); go('rules'); }
+      catch (e) { toast(e.message, true); }
+    };
+    const del = async () => {
+      try { await api('rules/remove', { id: p.id }); closeSheet(); go('rules'); }
+      catch (e) { toast(e.message, true); }
+    };
+    sheet.append(el('div', { className: 'foot' }, [
+      button('Delete', del, 'quiet'),
+      el('span', { className: 'msg' }),
+      button(p.auto ? 'Make suggest-only' : 'Make auto', toggleAuto),
+      button('Preview & act', () => openPreview({ kind: 'policy', value: p.id }, p.action), 'primary'),
+    ]));
+  }, 'narrow');
+}
+
+function openRuleForm(prefill = {}) {
+  openSheet((sheet) => {
+    sheet.append(sheetTop('New rule', 'When… then…'));
+    const name = el('input', { type: 'text', placeholder: 'e.g. Old newsletters' });
+    const cat = el('select', {}, CATEGORY_CHOICES.map((c) => el('option', { value: c,
+      textContent: c || 'Any category', selected: [].concat(prefill.category || [])[0] === c })));
+    const sender = el('input', { type: 'text', placeholder: 'Anyone', value: [].concat(prefill.sender || []).join(', ') });
+    const domain = el('input', { type: 'text', placeholder: 'Any domain', value: [].concat(prefill.domain || []).join(', ') });
+    const subject = el('input', { type: 'text', placeholder: 'Anything', value: prefill.subject_contains || '' });
+    const older = el('input', { type: 'number', min: '0', placeholder: 'Any age', value: prefill.older_than_days ?? '' });
+    const tri = (v) => el('select', {}, [['', 'Either'], ['true', 'Yes'], ['false', 'No']].map(([val, t]) =>
+      el('option', { value: val, textContent: t, selected: v === undefined ? val === '' : String(v) === val })));
+    const unread = tri(prefill.unread);
+    const inbox = tri(prefill.in_inbox);
+    const action = el('select', {}, [['archive', 'Archive'], ['mark_read', 'Mark read'],
+      ['label', 'Label / file into'], ['star', 'Star']].map(([v, t]) => el('option', { value: v, textContent: t })));
+    const label = el('input', { type: 'text', placeholder: 'Only for Label' });
+    const auto = el('input', { type: 'checkbox' });
+    const f = (lbl, input) => el('label', {}, [el('span', { className: 'fl', textContent: lbl }), input]);
+    sheet.append(el('div', { className: 'body' }, el('div', { className: 'form' }, [
+      f('Name', name),
+      el('h3', { textContent: 'When', style: 'margin:8px 0 0' }),
+      el('div', { className: 'row2' }, [f('Category', cat), f('Older than (days)', older)]),
+      el('div', { className: 'row2' }, [f('Sender(s)', sender), f('Domain(s)', domain)]),
+      f('Subject contains', subject),
+      el('div', { className: 'row2' }, [f('Unread', unread), f('In inbox', inbox)]),
+      el('h3', { textContent: 'Then', style: 'margin:8px 0 0' }),
+      el('div', { className: 'row2' }, [f('Action', action), f('Label', label)]),
+      el('label', { className: 'check' }, [auto,
+        el('span', { textContent: 'Auto — also run it when rules are applied or on the background schedule.' })]),
+    ])));
+    const msg = el('span', { className: 'msg' });
+    const save = button('Save rule', async () => {
+      const list = (x) => x.value.split(',').map((v) => v.trim()).filter(Boolean);
+      const cond = {};
+      if (cat.value) cond.category = [cat.value];
+      if (list(sender).length) cond.sender = list(sender);
+      if (list(domain).length) cond.domain = list(domain);
+      if (subject.value.trim()) cond.subject_contains = subject.value.trim();
+      if (older.value !== '') cond.older_than_days = Number(older.value);
+      if (unread.value) cond.unread = unread.value === 'true';
+      if (inbox.value) cond.in_inbox = inbox.value === 'true';
+      for (const k of ['newer_than_days', 'larger_than_kb', 'list_id', 'attention', 'retention',
+                       'starred', 'has_attachment', 'has_unsubscribe', 'protected']) {
+        if (prefill[k] !== undefined) cond[k] = prefill[k];
+      }
+      save.disabled = true;
+      try {
+        await api('rules/add', { name: name.value, conditions: cond, action: action.value,
+                                 label: label.value, auto: auto.checked });
+        closeSheet();
+        toast('Rule saved.');
+        go('rules');
+      } catch (e) { msg.textContent = e.message; msg.className = 'msg err'; save.disabled = false; }
+    }, 'primary');
+    sheet.append(el('div', { className: 'foot' }, [msg, button('Cancel', closeSheet, 'quiet'), save]));
+    name.focus();
+  }, 'narrow');
+}
+
+/* ---------- unsubscribe ---------- */
+VIEWS.unsubscribe = async (main) => {
+  const d = await api('unsubscribe?limit=300');
+  main.append(pageHead('Unsubscribe',
+    'Senders whose mail offers an unsubscribe. One-click ones are handled from here; for the ' +
+    'rest the sender’s page opens for you. Unsubscribing touches no mail — archive the backlog ' +
+    'in the same step if you want it gone.'));
+  const how = { 'one-click': 'One-click', link: 'Web page', mailto: 'Email' };
+  main.append(table([
+    { label: 'Sender', w: 'minmax(220px,1fr)', node: (r) => el('span', { className: 'mono',
+      style: 'font-size:12.5px', textContent: r.key }) },
+    { label: 'Emails', w: '76px', r: true, fmt: (r) => num(r.emails) },
+    { label: 'Unread', w: '76px', r: true, fmt: (r) => num(r.unread) },
+    { label: 'Size', w: '84px', r: true, fmt: (r) => size(r.bytes) },
+    { label: 'How', w: '96px', fmt: (r) => how[r.method] },
+    { label: '', w: '130px', r: true, node: (r) => r.unsubscribed_at
+      ? el('span', { className: 'pill ok', textContent: `done ${ago(r.unsubscribed_at)}` })
+      : button('Unsubscribe', stop(() => openUnsub(r.key, { method: r.method })), 'sm') },
+  ], d.rows, { onClick: (r) => openSender(r.key), empty: 'No sender here offers an unsubscribe.' }));
+};
+
+function openUnsub(sender, opt) {
+  const how = {
+    'one-click': 'A single unsubscribe request (RFC 8058) is sent from this computer.',
+    link: 'The sender’s unsubscribe page opens in a new tab; finish there.',
+    mailto: 'An unsubscribe email opens in your mail app; send it from there.',
+  }[opt.method] || '';
+  openSheet((sheet) => {
+    sheet.append(sheetTop('Unsubscribe', sender, { mono: true }));
+    sheet.append(el('div', { className: 'body' }, [
+      el('p', { style: 'margin:0 0 10px', textContent: how }),
+      el('p', { className: 'dim', style: 'margin:0', textContent:
+        'It cannot be undone from here. Only do it for lists you signed up for — unsubscribing ' +
+        'from spam tells the sender your address is real.' }),
+    ]));
+    const msg = el('span', { className: 'msg' });
+    const run = async (thenArchive) => {
+      if (!S.actions) return needActions();
+      sheet.querySelectorAll('.foot button').forEach((b) => (b.disabled = true));
+      try {
+        const r = await api('unsubscribe', { sender });
+        if (r.status === 'manual' && r.open) window.open(r.open, '_blank', 'noopener');
+        toast(r.status === 'ok' ? `Unsubscribed from ${sender}.` : 'Opened — finish there.');
+        if (thenArchive) openPreview({ kind: 'sender', value: sender }, 'archive');
+        else { closeSheet(); if (S.tab === 'unsubscribe') go('unsubscribe'); }
+      } catch (e) {
+        msg.textContent = e.message; msg.className = 'msg err';
+        sheet.querySelectorAll('.foot button').forEach((b) => (b.disabled = false));
+      }
+    };
+    sheet.append(el('div', { className: 'foot' }, [msg, button('Cancel', closeSheet, 'quiet'),
+      button('Unsubscribe', () => run(false)),
+      button('Unsubscribe & archive', () => run(true), 'primary')]));
+  }, 'narrow');
+}
+
+/* ---------- assistant (LLM suggestions) ---------- */
+VIEWS.assistant = async (main) => {
+  const d = await api('llm');
+  if (d.provider === 'off') {
+    main.append(pageHead('Assistant', 'Optional. Proposes rules for senders the classifier is unsure about.'));
+    main.append(el('div', { className: 'note-box' }, [
+      el('p', { style: 'margin:0 0 12px', textContent:
+        'When it is on, the assistant looks at senders the classifier is unsure about — or loud ones ' +
+        'nothing protects — and proposes to protect them, treat them as clutter, or recategorise ' +
+        'them. You accept or reject each one. It never changes mail, and it can only add protection, ' +
+        'never remove it. Run it on your own computer with Ollama, or use Claude.' }),
+      button('Set up the assistant', () => go('settings', { anchor: 'set-llm' }), 'primary'),
+    ]));
+    return;
+  }
+  const status = el('span', { className: 'count-label', textContent: d.job.running ? d.job.message : '' });
+  const ask = button('Ask about more senders', async () => {
+    ask.disabled = true;
+    try { await api('llm/suggest', { limit: 40 }); pollLLM(status); }
+    catch (e) { toast(e.message, true); ask.disabled = false; }
+  }, 'primary');
+  ask.disabled = d.job.running;
+  main.append(pageHead('Assistant',
+    `${d.provider === 'ollama' ? 'Ollama' : 'Claude'} · ${d.model}. ` +
+    (d.share_subjects ? 'Sender statistics and a few recent subjects are shared with the model. '
+                      : 'Only sender statistics are shared with the model. ') +
+    'Accepting a suggestion makes it a rule; nothing else changes.',
+    [status, button('Settings', () => go('settings', { anchor: 'set-llm' })), ask]));
+  if (d.job.running) pollLLM(status);
+
+  const decide = async (r, accept) => {
+    try {
+      await api('llm/decide', { id: r.id, accept });
+      toast(`${accept ? 'Accepted' : 'Rejected'}: ${r.action === 'ignore' ? 'clutter' : r.action} ${r.match_value}`);
+      S.overview = null;
+      go('assistant');
+    } catch (e) { toast(e.message, true); }
+  };
+  main.append(table([
+    { label: 'Sender', w: 'minmax(200px,1fr)', node: (r) => el('span', { className: 'mono',
+      style: 'font-size:12.5px', textContent: r.match_value }) },
+    { label: 'Suggests', w: '150px', node: (r) => el('span', { className: 'pill' + (r.action === 'protect' ? ' ok' : ''),
+      textContent: (r.action === 'ignore' ? 'clutter' : r.action) + (r.category ? ` → ${r.category}` : '') }) },
+    { label: 'Emails', w: '70px', r: true, fmt: (r) => num(r.emails) },
+    { label: 'Sure', w: '60px', r: true, fmt: (r) => `${Math.round((r.confidence || 0) * 100)}%` },
+    { label: 'Why', w: 'minmax(200px,2fr)', key: 'reason', wrap: true },
+    { label: '', w: '150px', r: true, node: (r) => el('div', { className: 'btns', style: 'justify-content:flex-end' }, [
+      button('Reject', stop(() => decide(r, false)), 'sm'),
+      button('Accept', stop(() => decide(r, true)), 'sm primary'),
+    ]) },
+  ], d.pending, { onClick: (r) => openSender(r.match_value),
+    empty: 'No pending suggestions. Ask about more senders to get some.' }));
+};
+
+function pollLLM(status) {
+  const tick = async () => {
+    let st;
+    try { st = await api('llm/status', {}); } catch (e) { toast(e.message, true); return; }
+    if (status.isConnected) status.textContent = st.message || '';
+    if (st.running) return setTimeout(tick, 1500);
+    if (st.error) toast(st.error, true);
+    S.overview = null;
+    if (S.tab === 'assistant') go('assistant');
+  };
+  setTimeout(tick, 800);
+}
+
+/* ---------- settings ---------- */
+VIEWS.settings = async (main) => {
+  const d = await api('settings');
+  const a = d.account;
+  main.append(pageHead('Settings', `For ${a.label}, unless a section says otherwise.`));
+  const wrap = el('div', { className: 'settings' });
+  const row = (id, title, about, content, scope) => el('div', { className: 'setrow', id }, [
+    el('div', {}, [el('h2', { textContent: title }), el('div', { className: 'about', textContent: about }),
+      scope ? el('div', { className: 'scope' }, el('span', { className: 'pill', textContent: scope })) : null]),
+    el('div', { className: 'stack-v' }, content),
+  ]);
+  const field = (label, input, hint) => el('div', { className: 'field' }, [
+    el('span', { textContent: label }), input, hint ? el('small', { textContent: hint }) : null]);
+  const saved = (msg = 'Saved.') => toast(msg);
+
+  /* mailbox */
+  const nameIn = el('input', { value: a.label });
+  const checksBox = el('div');
+  const runChecks = async (btn) => {
+    btn.disabled = true;
+    checksBox.textContent = '';
+    checksBox.append(el('p', { className: 'dim', style: 'margin:0', textContent: 'Checking…' }));
+    try {
+      const r = await api('doctor');
+      checksBox.textContent = '';
+      checksBox.append(el('div', { className: 'checks' }, r.checks.map((c) => el('div', { className: 'ck' }, [
+        el('span', { className: c.ok ? 'ok-mark' : c.ok === false ? 'bad-mark' : 'skip-mark',
+          textContent: c.ok ? '✓' : c.ok === false ? '✕' : '–' }),
+        el('span', { textContent: c.name }),
+        el('span', { className: 'dim', textContent: c.detail }),
+        c.fix && c.ok === false ? el('span', { className: 'fix', textContent: c.fix }) : null,
+      ]))));
+    } catch (e) { checksBox.textContent = e.message; }
+    btn.disabled = false;
+  };
+  const checkBtn = button('Check connection', () => runChecks(checkBtn));
+  const cred = [];
+  if (a.uses_oauth) {
+    cred.push(field('Sign-in', el('div', { className: 'inline' }, [
+      el('span', { className: 'grow dim', textContent: a.credential ? 'Signed in through Microsoft.' : 'Not signed in.' }),
+      button('Sign in again', () => reauthOAuth(a)),
+    ])));
+  } else {
+    const pw = el('input', { type: 'password', placeholder: 'New app password', autocomplete: 'off' });
+    cred.push(field('App password', el('div', { className: 'inline' }, [
+      el('div', { className: 'grow' }, pw),
+      button('Replace', async () => {
+        try { await api('settings/password', { password: pw.value }); pw.value = ''; saved('Password replaced and checked.'); }
+        catch (e) { toast(e.message, true); }
+      }),
+    ]), a.setup_url ? `Create one at ${a.setup_url}. It is checked before it replaces the old one.`
+                    : 'It is checked before it replaces the old one.'));
+  }
+  wrap.append(row('set-mailbox', 'Mailbox', 'Connection details and sign-in.', [
+    el('dl', { className: 'kv' }, [
+      el('dt', { textContent: 'Address' }), el('dd', { textContent: a.email }),
+      el('dt', { textContent: 'Provider' }), el('dd', { textContent: a.provider_name }),
+      el('dt', { textContent: 'Server' }), el('dd', { className: 'mono', style: 'font-size:12.5px',
+        textContent: `${a.host}:${a.port} (${a.security})` }),
+      el('dt', { textContent: 'Indexed' }), el('dd', { textContent:
+        `${num(a.messages)} messages · synced ${ago(a.last_sync)}` }),
+    ]),
+    field('Name', el('div', { className: 'inline' }, [el('div', { className: 'grow' }, nameIn),
+      button('Save', async () => {
+        try { await api('settings/account', { label: nameIn.value }); saved(); await refreshHeader(); }
+        catch (e) { toast(e.message, true); }
+      })])),
+    ...cred,
+    el('div', { className: 'btns' }, [checkBtn]),
+    checksBox,
+  ]));
+
+  /* actions */
+  const modeChoice = (on, title, text) => el('button', { className: 'choice' + (a.actions_enabled === on ? ' on' : ''),
+    onclick: () => setActions(on) }, [el('b', { textContent: title }), el('span', { textContent: text })]);
+  wrap.append(row('set-actions', 'Actions', 'Whether this app may change mail in this mailbox. ' +
+    'Even with actions on there is no permanent delete — trash is your provider’s own, and every ' +
+    'batch can be undone.', [
+    el('div', { className: 'choices', style: 'grid-template-columns:1fr 1fr' }, [
+      modeChoice(false, 'Read-only', 'Look, preview and plan. Nothing in the mailbox changes.'),
+      modeChoice(true, 'Actions on', 'Archive, trash, label, mark read and unsubscribe — after a preview.'),
+    ]),
+  ]));
+
+  /* sync */
+  const windows = [[30, 'Last 30 days'], [90, 'Last 3 months'], [365, 'Last year'], [730, 'Last 2 years'],
+                   [1825, 'Last 5 years'], [36500, 'Everything']];
+  const win = el('select', {}, windows.map(([v, t]) => el('option', { value: v, textContent: t,
+    selected: v === a.sync_days })));
+  if (!windows.some(([v]) => v === a.sync_days)) win.prepend(el('option', { value: a.sync_days,
+    textContent: `Last ${a.sync_days} days`, selected: true }));
+  wrap.append(row('set-sync', 'Sync', 'How far back to index. Only headers are fetched — never bodies.', [
+    field('Window', el('div', { className: 'inline' }, [el('div', { className: 'grow' }, win),
+      button('Save', async () => {
+        try { await api('settings/account', { sync_days: Number(win.value) }); saved('Saved. Sync to fetch the new window.'); }
+        catch (e) { toast(e.message, true); }
+      })])),
+    el('div', { className: 'btns' }, [
+      button('Sync now', () => startSync(false)),
+      button('Re-sync everything', () => startSync(true), 'quiet'),
+    ]),
+  ]));
+
+  /* classification */
+  const chosen = new Set(a.locales.length ? a.locales : Object.keys(d.locales));
+  const packNames = { en: 'English', in: 'India', us: 'United States', uk: 'United Kingdom',
+                      de: 'German', fr: 'French', es: 'Spanish' };
+  const packs = el('div', { className: 'chips' }, Object.keys(d.locales).map((k) => {
+    const b = el('button', { className: 'chip' + (chosen.has(k) ? ' on' : ''), textContent: packNames[k] || k,
+      title: d.locales[k].join(', ') });
+    b.onclick = () => { chosen.has(k) ? chosen.delete(k) : chosen.add(k); b.classList.toggle('on'); };
+    return b;
+  }));
+  const reviewIn = el('input', { value: a.review_label });
+  wrap.append(row('set-classify', 'Classification',
+    'How mail is sorted. Keyword packs are the subject words the classifier looks for, per language ' +
+    'or country.', [
+    field('Keyword packs', packs, 'Turn off packs that misfire for you. Saving reclassifies the mailbox.'),
+    field('“Label for review” uses', reviewIn),
+    el('div', { className: 'btns' }, [
+      button('Save', async () => {
+        if (!chosen.size) return toast('Keep at least one keyword pack.', true);
+        try {
+          const r = await api('settings/account', { locales: [...chosen], review_label: reviewIn.value });
+          saved(`Saved. Reclassified ${num(r.reclassified)} messages.`);
+          S.overview = null;
+        } catch (e) { toast(e.message, true); }
+      }, 'primary'),
+      button('Check accuracy', openEval),
+    ]),
+  ]));
+
+  /* assistant */
+  wrap.append(row('set-llm', 'Assistant', 'Optional. Proposes rules for senders the classifier ' +
+    'is unsure about. It never changes mail and can only add protection.', llmSettings(d.llm)));
+
+  /* background sync */
+  const sch = d.schedule;
+  const every = el('select', {}, [[1, 'Every hour'], [3, 'Every 3 hours'], [6, 'Every 6 hours'],
+    [12, 'Every 12 hours'], [24, 'Once a day']].map(([v, t]) => el('option', { value: v, textContent: t, selected: v === 6 })));
+  const applyRules = el('input', { type: 'checkbox' });
+  const notify = el('input', { type: 'checkbox', checked: true });
+  wrap.append(row('set-schedule', 'Background sync',
+    'Keep every mailbox up to date even when this page is closed, using your computer’s own ' +
+    'scheduler. A notification appears when something needs you.', [
+    el('p', { style: 'margin:0', className: sch.installed ? '' : 'dim', textContent: sch.installed
+      ? `On. ${sch.last_line ? 'Last run: ' + sch.last_line : 'It has not run yet.'}`
+      : sch.installed === false ? 'Off.' : 'Unknown on this system.' }),
+    field('How often', every),
+    el('label', { className: 'check' }, [applyRules, el('span', { textContent:
+      'Also apply auto rules (only on mailboxes with actions on; never trash)' })]),
+    el('label', { className: 'check' }, [notify, el('span', { textContent: 'Show a desktop notification' })]),
+    el('div', { className: 'btns' }, [
+      button(sch.installed ? 'Update' : 'Turn on', async () => {
+        try {
+          const r = await api('settings/schedule', { every: Number(every.value),
+            apply_rules: applyRules.checked, notify: notify.checked });
+          toast(r.message);
+          go('settings', { anchor: 'set-schedule' });
+        } catch (e) { toast(e.message, true); }
+      }, 'primary'),
+      sch.installed ? button('Turn off', async () => {
+        try { const r = await api('settings/schedule', { remove: true }); toast(r.message);
+              go('settings', { anchor: 'set-schedule' }); }
+        catch (e) { toast(e.message, true); }
+      }) : null,
+    ]),
+  ], 'All mailboxes'));
+
+  /* export */
+  wrap.append(row('set-export', 'Export', 'Download what the app knows, for a spreadsheet or a script.', [
+    el('div', { className: 'btns' }, [
+      button('Senders (CSV)', () => download({ what: 'senders' })),
+      button('Domains (CSV)', () => download({ what: 'domains' })),
+      button('Categories (CSV)', () => download({ what: 'categories' })),
+      button('All messages (CSV)', () => download({ what: 'messages' })),
+      button('All messages (JSON)', () => download({ what: 'messages', format: 'json' }), 'quiet'),
+    ]),
+  ]));
+
+  /* MCP */
+  const cfg = JSON.stringify({ mcpServers: { mailcleaner: { command: d.mcp.command[0],
+    args: d.mcp.command.slice(1) } } }, null, 2);
+  wrap.append(row('set-mcp', 'Connect to Claude',
+    'Let Claude Desktop, Claude Code or another MCP app answer questions about your mailbox. ' +
+    'It gets read-only access to this index — no tool can change mail.', [
+    el('pre', { className: 'code', textContent: cfg }),
+    el('div', { className: 'btns' }, [
+      button('Copy', async () => {
+        try { await navigator.clipboard.writeText(cfg); toast('Copied. Paste it into your MCP app’s settings.'); }
+        catch { toast('Select the text and copy it.', true); }
+      }),
+      el('span', { className: 'count-label', textContent: 'Claude Desktop: Settings → Developer → Edit config.' }),
+    ]),
+  ], 'All mailboxes'));
+
+  /* remove */
+  const confirmIn = el('input', { placeholder: a.email });
+  wrap.append(row('set-remove', 'Remove mailbox',
+    'Forget this mailbox here: its index, rules, history and stored password. No mail is touched.', [
+    field('Type the address to confirm', el('div', { className: 'inline' }, [
+      el('div', { className: 'grow' }, confirmIn),
+      button('Remove', async () => {
+        try {
+          await api('settings/remove', { confirm: confirmIn.value.trim() });
+          toast(`Removed ${a.email}.`);
+          await reloadAll('overview');
+        } catch (e) { toast(e.message, true); }
+      }, 'danger'),
+    ])),
+  ]));
+  wrap.append(el('p', { className: 'count-label', style: 'margin-top:20px', textContent: `mailcleaner ${d.version}` }));
+  main.append(wrap);
+};
+
+function setActions(on) {
+  if (on === S.actions) return;
+  if (!on) {
+    return api('settings/actions', { enabled: false }).then(async () => {
+      toast('Read-only again.'); await refreshHeader(); go(S.tab, { anchor: 'set-actions' });
+    }).catch((e) => toast(e.message, true));
+  }
+  confirmSheet({
+    title: 'Turn on actions?',
+    body: ['Archive, trash, label, mark read and unsubscribe become available for this mailbox.',
+           'Every bulk action still shows a preview first, protected mail is still excluded, and ' +
+           'every batch can be undone from History. Nothing is ever permanently deleted.'],
+    confirm: 'Turn on actions',
+    run: async () => {
+      await api('settings/actions', { enabled: true });
+      toast('Actions on.');
+      await refreshHeader();
+      go(S.tab, { anchor: 'set-actions' });
+    },
+  });
+}
+
+function llmSettings(c) {
+  const box = el('div', { className: 'stack-v' });
+  let provider = c.provider;
+  const draw = () => {
+    box.textContent = '';
+    const choice = (v, title, text) => el('button', { className: 'choice' + (provider === v ? ' on' : ''),
+      onclick: () => { provider = v; draw(); } }, [el('b', { textContent: title }), el('span', { textContent: text })]);
+    box.append(el('div', { className: 'choices' }, [
+      choice('off', 'Off', 'No model is used.'),
+      choice('ollama', 'On this computer', 'Ollama. Nothing leaves your machine.'),
+      choice('anthropic', 'Claude', 'Anthropic’s API. Sender details are sent to it.'),
+    ]));
+    const share = el('input', { type: 'checkbox', checked: c.share_subjects });
+    const fields = {};
+    if (provider === 'ollama') {
+      fields.host = el('input', { value: c.host });
+      fields.model = el('input', { value: c.provider === 'ollama' ? c.model : c.defaults.ollama, list: 'ollama-models' });
+      const dl = el('datalist', { id: 'ollama-models' });
+      api('llm/models?host=' + encodeURIComponent(c.host)).then((r) => {
+        r.models.forEach((m) => dl.append(el('option', { value: m })));
+        hint.textContent = r.models.length ? `Installed: ${r.models.join(', ')}`
+          : 'Ollama is not answering at that address. Install it from ollama.com, then pull a model (e.g. llama3.1).';
+      }).catch(() => {});
+      const hint = el('small');
+      box.append(el('div', { className: 'row2' }, [
+        el('label', { className: 'field' }, [el('span', { textContent: 'Ollama address' }), fields.host]),
+        el('label', { className: 'field' }, [el('span', { textContent: 'Model' }), fields.model, dl]),
+      ]), hint);
+    }
+    let consent;
+    if (provider === 'anthropic') {
+      fields.model = el('input', { value: c.provider === 'anthropic' ? c.model : c.defaults.anthropic });
+      fields.key = el('input', { type: 'password', autocomplete: 'off',
+        placeholder: c.has_key ? 'A key is stored — leave blank to keep it' : 'sk-ant-…' });
+      consent = el('input', { type: 'checkbox', checked: c.provider === 'anthropic' });
+      box.append(el('div', { className: 'row2' }, [
+        el('label', { className: 'field' }, [el('span', { textContent: 'Model' }), fields.model]),
+        el('label', { className: 'field' }, [el('span', { textContent: 'API key' }), fields.key,
+          el('small', { textContent: 'Kept in your system keychain, never shown again.' })]),
+      ]));
+      box.append(el('label', { className: 'check' }, [consent, el('span', { textContent:
+        'I understand sender addresses, message counts and read rates' +
+        ' (and recent subject lines, if allowed below) are sent to Anthropic. Message bodies never are.' })]));
+    }
+    if (provider !== 'off') {
+      box.append(el('label', { className: 'check' }, [share, el('span', { textContent:
+        'Share up to five recent subject lines per sender — better suggestions, more shared' })]));
+    }
+    box.append(el('div', { className: 'btns' }, [button('Save', async () => {
+      try {
+        await api('settings/llm', { provider, model: fields.model?.value, host: fields.host?.value,
+          api_key: fields.key?.value, share_subjects: share.checked, cloud_consent: consent?.checked });
+        toast(provider === 'off' ? 'Assistant off.' : 'Assistant on. Open Assistant to ask for suggestions.',
+              false, provider === 'off' ? null : { label: 'Open', run: () => go('assistant') });
+        S.overview = null;
+        await refreshHeader();
+      } catch (e) { toast(e.message, true); }
+    }, 'primary')]));
+  };
+  draw();
+  return [box];
+}
+
+/* The classifier check: a random sample, corrected by hand, then scored. */
+async function openEval() {
+  const sheet = openSheet((s) => s.append(el('div', { className: 'body loading', textContent: 'Picking a sample…' })));
+  let d;
+  try { d = await api('eval/sample?n=30'); } catch (e) { return sheetError(sheet, e.message); }
+  sheet.textContent = '';
+  sheet.append(sheetTop('Classifier check', 'Correct what it got wrong',
+    { sub: 'Thirty random messages. Change the category where it is wrong, and tick Important for ' +
+           'anything you would not want cleaned up.' }));
+  const rows = d.rows.map((r) => ({ ...r,
+    sel: el('select', {}, d.categories.map((c) => el('option', { value: c, textContent: c, selected: c === r.category }))),
+    imp: el('input', { type: 'checkbox', checked: !!r.protected }) }));
+  const body = el('div', { className: 'body' });
+  body.append(table([
+    { label: 'Message', w: 'minmax(260px,1fr)', node: (r) => el('div', {}, [
+      el('div', { className: 'mono', style: 'font-size:12px; color:var(--dim)', textContent: r.from_email }),
+      el('div', { style: 'overflow:hidden; text-overflow:ellipsis', textContent: r.subject || '(no subject)' })]) },
+    { label: 'Category', w: '150px', node: (r) => r.sel },
+    { label: 'Important', w: '90px', c: true, node: (r) => r.imp },
+  ], rows));
+  const result = el('div', { style: 'margin-top:20px' });
+  body.append(result);
+  sheet.append(body);
+  const scoreBtn = button('Score', async () => {
+    try {
+      const s = await api('eval/score', { rows: rows.map((r) => ({ msg_key: r.msg_key,
+        true_category: r.sel.value, true_protected: r.imp.checked })) });
+      result.textContent = '';
+      result.append(el('div', { className: 'tiles', style: 'grid-template-columns:repeat(3,1fr)' }, [
+        el('div', { className: 'tile' }, [el('div', { className: 'v num', style: `color:${s.missed_protection ? 'var(--bad)' : 'var(--green-d)'}`,
+          textContent: num(s.missed_protection) }), el('div', { className: 'k', textContent: 'important but unprotected' })]),
+        el('div', { className: 'tile' }, [el('div', { className: 'v num', textContent: `${Math.round(s.accuracy * 100)}%` }),
+          el('div', { className: 'k', textContent: 'categories right' })]),
+        el('div', { className: 'tile' }, [el('div', { className: 'v num', textContent: num(s.over_protection) }),
+          el('div', { className: 'k', textContent: 'protected but not important' })]),
+      ]));
+      if (s.missed_examples.length) {
+        result.append(el('p', { style: 'margin:16px 0 8px', textContent:
+          'Protect these senders from their panel so this cannot happen:' }));
+        result.append(el('div', { className: 'subjects' }, s.missed_examples.map((m) => el('div', { className: 's' }, [
+          el('div', { className: 't', textContent: `${m.from_email} — ${m.subject}` }),
+          el('div', { className: 'w', textContent: m.predicted })]))));
+      }
+      result.scrollIntoView({ behavior: 'smooth' });
+    } catch (e) { toast(e.message, true); }
+  }, 'primary');
+  sheet.append(el('div', { className: 'foot' }, [el('span', { className: 'msg',
+    textContent: 'Nothing is saved; this only measures.' }), button('Close', closeSheet, 'quiet'), scoreBtn]));
+}
 
 /* ---------- nav ---------- */
 const NAV = [
-  ['overview', 'Overview'], ['senders', 'Senders'], ['cleanup', 'Cleanup'],
-  null,
-  ['attention', 'Attention'], ['domains', 'Domains'], ['categories', 'Categories'],
-  ['ages', 'Age'], ['history', 'History'],
+  ['Mailbox', [['overview', 'Overview'], ['attention', 'Attention'], ['senders', 'Senders'], ['cleanup', 'Cleanup']]],
+  ['Explore', [['domains', 'Domains'], ['categories', 'Categories'], ['ages', 'Age']]],
+  ['Automate', [['rules', 'Rules'], ['unsubscribe', 'Unsubscribe'], ['assistant', 'Assistant']]],
+  ['', [['history', 'History'], ['settings', 'Settings']]],
 ];
 
 function drawNav() {
   const nav = $('#nav');
+  const mob = $('#mobile-nav');
   nav.textContent = '';
+  mob.textContent = '';
   if (S.needsSetup) return;
-  for (const item of NAV) {
-    if (!item) { nav.append(el('div', { className: 'rule' })); continue; }
-    const [k, label] = item;
-    nav.append(el('button', {
-      className: S.tab === k ? 'on' : '', textContent: label, onclick: () => go(k),
-    }));
+  // Only counts that ask for a decision; totals live on the pages themselves.
+  const counts = { assistant: S.overview?.pending_suggestions };
+  for (const [label, items] of NAV) {
+    const g = el('div', { className: 'group' });
+    if (label) g.append(el('div', { className: 'gl', textContent: label }));
+    for (const [k, t] of items) {
+      g.append(el('button', { className: S.tab === k ? 'on' : '', onclick: () => go(k) }, [
+        el('span', { textContent: t }),
+        counts[k] ? el('span', { className: 'count', textContent: num(counts[k]) }) : null,
+      ]));
+      mob.append(el('button', { className: S.tab === k ? 'on' : '', textContent: t, onclick: () => go(k) }));
+    }
+    nav.append(g);
   }
-  nav.append(el('div', { className: 'rule' }));
   const prot = S.overview ? S.overview.stats.protected : 0;
   nav.append(el('div', { className: 'note' }, [
-    el('div', { className: 'row' }, [
-      el('span', { className: 'swatch' }),
-      el('span', { className: 'num', textContent: `${num(prot)} protected` }),
-    ]),
+    el('div', { className: 'row' }, [el('span', { className: 'swatch' }),
+      el('span', { className: 'num', textContent: `${num(prot)} protected` })]),
     el('div', { textContent: 'Never touched by any action.' }),
   ]));
 }
@@ -1115,29 +1762,35 @@ async function go(tab, opts = {}) {
   S.tab = tab;
   drawNav();
   const main = $('#main');
-  main.textContent = '';
   if (S.needsSetup) {
-    main.append(el('div', { className: 'empty' }, [
-      el('h2', { textContent: 'Connect a mailbox' }),
-      el('p', { className: 'lede', textContent:
-        'Nothing is indexed yet. Add Gmail, Outlook, Proton, Fastmail, iCloud, ' +
-        'Yahoo, Zoho or any IMAP server — you can add as many as you like, and ' +
-        'each is kept separate.' }),
-      el('button', { className: 'btn primary big', textContent: 'Add a mailbox',
-        onclick: () => openAddAccount() }),
+    main.textContent = '';
+    const logo = $('.brand .mark').cloneNode(true);
+    logo.setAttribute('width', '72');
+    logo.setAttribute('height', '72');
+    main.append(el('div', { className: 'onboard' }, [
+      logo,
+      el('h1', { textContent: 'Welcome to mailcleaner' }),
+      el('p', { textContent: 'See who fills your inbox, then clean it up safely. Connect Gmail, ' +
+        'Outlook, Proton, Fastmail, iCloud, Yahoo, Zoho or any IMAP server to start.' }),
+      button('Add a mailbox', () => openAddAccount(), 'primary big'),
+      el('div', { className: 'facts' }, ['Runs on this computer', 'Reads headers only',
+        'Never deletes'].map((t) => el('span', { textContent: t }))),
     ]));
     return;
   }
-  main.append(el('p', { className: 'lede', textContent: 'Loading…' }));
+  if (!main.childElementCount) main.append(el('div', { className: 'loading', textContent: 'Loading…' }));
   const fresh = el('main', { id: 'main' });
   try {
     await VIEWS[tab](fresh);
-    main.replaceWith(fresh);
   } catch (e) {
-    main.textContent = '';
-    main.append(el('p', { className: 'err', textContent: e.message }));
+    fresh.textContent = '';
+    fresh.append(el('p', { className: 'err', textContent: e.message }));
   }
+  if (S.tab !== tab) return;               // the user moved on while this loaded
+  $('#main').replaceWith(fresh);
   drawSelectionBar();
+  if (opts.anchor) document.getElementById(opts.anchor)?.scrollIntoView({ block: 'start' });
+  else if (!opts.keepScroll) window.scrollTo(0, 0);
   if (opts.focus === 'search') {
     const i = document.querySelector('.toolbar input');
     if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
@@ -1145,29 +1798,28 @@ async function go(tab, opts = {}) {
 }
 
 function drawMode() {
-  $('#seg-ro').className = S.actions ? '' : 'on';
-  $('#seg-on').className = S.actions ? 'on' : '';
+  const m = $('#mode');
+  m.className = 'mode' + (S.actions ? ' on' : '');
+  m.querySelector('span').textContent = S.actions ? 'Actions on' : 'Read-only';
+  m.hidden = S.needsSetup;
 }
-
-$('#seg-ro').onclick = () => {
-  if (!S.actions) return;
-  toast('Actions stay on until you run `mclean disable-actions` in the terminal.');
-};
-$('#seg-on').onclick = () => { if (!S.actions) needActions(); };
+$('#mode').onclick = () => go('settings', { anchor: 'set-actions' });
+$('.brand').onclick = (e) => { e.preventDefault(); if (!S.needsSetup) go('overview'); };
 
 async function refreshHeader() {
   try {
     const d = await api('overview');
-    S.overview = d;
+    S.overview = d.needs_setup ? null : d;
     S.needsSetup = !!d.needs_setup;
     S.actions = !!d.actions_enabled;
     if (!S.actions) S.selected.clear();
     drawAccounts(d.accounts || [], d.account_id);
-    $('#btn-sync').disabled = S.needsSetup;
-    $('#headstat').textContent = S.needsSetup ? 'no mailbox connected' :
-      `${num(d.stats.total)} messages · synced ${ago(d.last_sync)} · ` +
-      `${d.sync_days}d window`;
+    $('.syncbox').hidden = S.needsSetup;
+    $('#ask').hidden = S.needsSetup;
+    $('#synced').textContent = S.needsSetup ? '' : `Synced ${ago(d.last_sync)}`;
+    $('#synced').title = S.needsSetup ? '' : `${num(d.stats.total)} messages · ${d.sync_days}-day window`;
     drawMode();
+    drawNav();
   } catch (e) { toast(e.message, true); }
 }
 
@@ -1180,50 +1832,9 @@ function hueFor(id) {
   return h;
 }
 function badge(a) {
-  return el('span', { className: 'dot',
-    style: `background: oklch(0.55 0.12 ${hueFor(a.id)})`,
+  return el('span', { className: 'dot', style: `background: oklch(0.55 0.12 ${hueFor(a.id)})`,
     textContent: (a.label || a.email || '?').trim()[0] || '?' });
 }
-
-function drawAccounts(rows, activeId) {
-  S.accounts = rows;
-  S.activeAccount = activeId || '';
-  const active = rows.find((a) => a.id === activeId);
-  const btn = $('#acct-btn');
-  btn.textContent = '';
-  btn.append(
-    active ? badge(active) : el('span', { className: 'dot', textContent: '+' }),
-    el('span', { className: 'who',
-      textContent: active ? active.label : 'No mailbox yet' }),
-    caret(),
-  );
-
-  const menu = $('#acct-menu');
-  menu.textContent = '';
-  if (rows.length) menu.append(el('div', { className: 'eyebrow', textContent: 'Mailboxes' }));
-  for (const a of rows) {
-    menu.append(el('button', { className: 'mrow', role: 'menuitem',
-      onclick: () => pickAccount(a) }, [
-      badge(a),
-      el('div', { className: 't' }, [
-        el('div', { className: 'n', textContent: a.label }),
-        el('div', { className: 's', textContent:
-          a.label === a.email ? a.provider : `${a.provider} · ${a.email}` }),
-      ]),
-      el('span', { className: 'tick', textContent: a.id === activeId ? '✓' : '' }),
-    ]));
-  }
-  if (rows.length) menu.append(el('div', { className: 'sep' }));
-  menu.append(el('button', { className: 'mrow add', role: 'menuitem',
-    onclick: () => { closeMenu(); openAddAccount(); } }, [
-    el('span', { className: 'dot', textContent: '+' }),
-    el('div', { className: 't' }, [
-      el('div', { className: 'n', textContent: 'Add mailbox' }),
-      el('div', { className: 's', textContent: 'Gmail, Outlook, Proton, IMAP…' }),
-    ]),
-  ]));
-}
-
 function caret() {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('class', 'caret');
@@ -1236,9 +1847,39 @@ function caret() {
   path.setAttribute('stroke', 'currentColor');
   path.setAttribute('stroke-width', '1.4');
   path.setAttribute('stroke-linecap', 'round');
-  path.setAttribute('stroke-linejoin', 'round');
   svg.append(path);
   return svg;
+}
+
+function drawAccounts(rows, activeId) {
+  S.accounts = rows;
+  S.activeAccount = activeId || '';
+  const active = rows.find((a) => a.id === activeId);
+  const btn = $('#acct-btn');
+  btn.textContent = '';
+  btn.append(active ? badge(active) : el('span', { className: 'dot', textContent: '+' }),
+    el('span', { className: 'who', textContent: active ? active.label : 'Add a mailbox' }), caret());
+  const menu = $('#acct-menu');
+  menu.textContent = '';
+  if (rows.length) menu.append(el('div', { className: 'eyebrow', textContent: 'Mailboxes' }));
+  for (const a of rows) {
+    menu.append(el('button', { className: 'mrow', role: 'menuitem', onclick: () => pickAccount(a) }, [
+      badge(a),
+      el('div', { className: 't' }, [
+        el('div', { className: 'n', textContent: a.label }),
+        el('div', { className: 's', textContent: (a.label === a.email ? a.provider : `${a.provider} · ${a.email}`) +
+          (a.actions_enabled ? ' · actions on' : '') }),
+      ]),
+      el('span', { className: 'tick', textContent: a.id === activeId ? '✓' : '' }),
+    ]));
+  }
+  if (rows.length) menu.append(el('div', { className: 'sep' }));
+  menu.append(el('button', { className: 'mrow add', role: 'menuitem',
+    onclick: () => { closeMenu(); openAddAccount(); } }, [
+    el('span', { className: 'dot', textContent: '+' }),
+    el('div', { className: 't' }, [el('div', { className: 'n', textContent: 'Add mailbox' }),
+      el('div', { className: 's', textContent: 'Gmail, Outlook, Proton, IMAP…' })]),
+  ]));
 }
 
 function openMenu() {
@@ -1255,23 +1896,20 @@ function closeMenu() {
 }
 function outsideMenu(e) { if (!e.target.closest('.acct')) closeMenu(); }
 function escMenu(e) { if (e.key === 'Escape') closeMenu(); }
-
 $('#acct-btn').onclick = () => ($('#acct-menu').hidden ? openMenu() : closeMenu());
 
 async function pickAccount(a) {
   closeMenu();
   if (a.id === S.activeAccount) return;
-  try {
-    await api('account/use', { id: a.id });
-    await reloadAll();
-  } catch (err) { toast(err.message, true); }
+  try { await api('account/use', { id: a.id }); await reloadAll(); }
+  catch (err) { toast(err.message, true); }
 }
 
-async function reloadAll() {
+async function reloadAll(tab) {
   S.overview = null;
   S.selected.clear();
   await refreshHeader();
-  await go(S.tab);
+  await go(tab || S.tab);
 }
 
 /* ---------- connecting a mailbox ----------
@@ -1279,192 +1917,170 @@ async function reloadAll() {
    one (Outlook) hand the browser a device code to enter on their own site. */
 async function openAddAccount(preselect) {
   let providers = [];
-  const sheet = openSheet((x) => x.append(el('div', { className: 'body' },
-    el('p', { className: 'lede', textContent: 'Loading providers…' }))));
-  try {
-    providers = (await api('providers')).rows;
-  } catch (e) {
-    sheet.textContent = '';
-    sheet.append(el('div', { className: 'body' },
-      el('p', { className: 'err', textContent: e.message })));
-    return;
-  }
-
-  const head = (title, sub) => el('div', { className: 'top' }, [
-    el('div', { className: 'toprow' }, [
-      el('div', { style: 'flex:1; min-width:0' }, [
-        el('div', { className: 'who', textContent: title }),
-        el('div', { className: 'pd', style: 'margin-top:6px', textContent: sub }),
-      ]),
-      el('button', { className: 'x', textContent: '✕', onclick: closeSheet }),
-    ]),
-  ]);
+  const sheet = openSheet((x) => x.append(el('div', { className: 'body loading', textContent: 'Loading providers…' })));
+  try { providers = (await api('providers')).rows; }
+  catch (e) { return sheetError(sheet, e.message); }
 
   function chooser() {
     sheet.textContent = '';
-    sheet.append(head('Add a mailbox',
-      'Each mailbox is indexed separately — its own rules, history and settings.'));
-    const list = el('div', { className: 'plist' });
-    for (const p of providers) {
-      list.append(el('button', { onclick: () => form(p) }, [
+    sheet.append(sheetTop('Add a mailbox', 'Which service is it?',
+      { sub: 'Each mailbox is indexed separately — its own rules, history and settings.' }));
+    sheet.append(el('div', { className: 'body' }, el('div', { className: 'plist' }, providers.map((p) =>
+      el('button', { onclick: () => form(p) }, [
         el('div', { className: 'pn', textContent: p.name }),
-        el('div', { className: 'pd', textContent: p.uses_oauth
-          ? 'Signs in through your browser' : 'Uses an app password' }),
-      ]));
-    }
-    sheet.append(el('div', { className: 'body' }, [
-      el('h3', { textContent: 'Provider' }), list,
-    ]));
+        el('div', { className: 'pd', textContent: p.uses_oauth ? 'Signs in through your browser' : 'Uses an app password' }),
+      ])))));
   }
 
   function form(p) {
     sheet.textContent = '';
-    sheet.append(head(p.name, p.uses_oauth
+    sheet.append(sheetTop('Add a mailbox', p.name, { sub: p.uses_oauth
       ? 'You will finish signing in on the provider’s own site.'
-      : 'The password goes straight to your system keychain.'));
-
-    const email = el('input', { type: 'email', placeholder: 'you@example.com',
-      autocomplete: 'username' });
-    const label = el('input', { type: 'text', placeholder: 'optional, e.g. work' });
-    const pass = el('input', { type: 'password', autocomplete: 'off',
-      placeholder: 'app password' });
+      : 'The password goes straight to your system keychain.' }));
+    const email = el('input', { type: 'email', placeholder: 'you@example.com', autocomplete: 'username' });
+    const label = el('input', { type: 'text', placeholder: 'Optional, e.g. Work' });
+    const pass = el('input', { type: 'password', autocomplete: 'off', placeholder: 'App password' });
     const host = el('input', { type: 'text', value: p.host || '' });
     const port = el('input', { type: 'number', value: String(p.port) });
     const sec = el('select', {}, ['ssl', 'starttls', 'none'].map((v) =>
       el('option', { value: v, selected: v === p.security, textContent: v })));
-
+    const f = (lbl, input) => el('label', {}, [el('span', { className: 'fl', textContent: lbl }), input]);
     const fields = el('div', { className: 'form' }, [
-      el('div', {}, [el('span', { className: 'fl', textContent: 'Email address' }), email]),
-      el('div', {}, [el('span', { className: 'fl', textContent: 'Name for this mailbox' }), label]),
-    ]);
+      el('div', { className: 'row2' }, [f('Email address', email), f('Name for this mailbox', label)])]);
     if (p.ask_host) {
-      fields.append(el('div', { className: 'row2' }, [
-        el('div', {}, [el('span', { className: 'fl', textContent: 'IMAP host' }), host]),
-        el('div', {}, [el('span', { className: 'fl', textContent: 'Port' }), port]),
-      ]));
-      fields.append(el('div', {}, [
-        el('span', { className: 'fl', textContent: 'Connection security' }), sec]));
+      fields.append(el('div', { className: 'row2' }, [f('IMAP host', host), f('Port', port)]));
+      fields.append(f('Connection security', sec));
     }
-    if (!p.uses_oauth) {
-      fields.append(el('div', {}, [
-        el('span', { className: 'fl', textContent: 'App password' }), pass]));
-    }
-
+    if (!p.uses_oauth) fields.append(f('App password', pass));
     sheet.append(el('div', { className: 'body' }, [
-      el('h3', { textContent: 'Before you start' }),
-      linkify(p.help),
-      el('h3', { textContent: 'Mailbox' }),
-      fields,
+      el('h3', { textContent: 'Before you start' }), linkify(p.help),
+      el('h3', { textContent: 'Mailbox' }), fields,
     ]));
-
-    const msg = el('div', { className: 'msg' });
-    const go = el('button', { className: 'btn primary',
-      textContent: p.uses_oauth ? 'Start sign-in' : 'Connect' });
-    go.onclick = async () => {
-      const body = {
-        provider: p.key, email: email.value.trim(), label: label.value.trim(),
-        host: host.value.trim(), port: port.value, security: sec.value,
-      };
-      go.disabled = true;
+    const msg = el('span', { className: 'msg' });
+    const submit = button(p.uses_oauth ? 'Start sign-in' : 'Connect', async () => {
+      const body = { provider: p.key, email: email.value.trim(), label: label.value.trim(),
+                     host: host.value.trim(), port: port.value, security: sec.value };
+      submit.disabled = true;
       msg.textContent = p.uses_oauth ? 'Asking for a code…' : 'Connecting…';
       msg.className = 'msg';
       try {
-        if (p.uses_oauth) {
-          const st = await api('account/oauth/start', body);
-          device(p, st);
-        } else {
-          const r = await api('account/add', { ...body, password: pass.value });
-          await connected(r);
-        }
+        if (p.uses_oauth) device(p, await api('account/oauth/start', body), false);
+        else await connected(await api('account/add', { ...body, password: pass.value }));
       } catch (e) {
         msg.textContent = e.message;
         msg.className = 'msg err';
-        go.disabled = false;
+        submit.disabled = false;
       }
-    };
-    sheet.append(el('div', { className: 'foot' }, [
-      msg,
-      el('button', { className: 'btn quiet', textContent: 'Back', onclick: chooser }),
-      go,
-    ]));
+    }, 'primary');
+    sheet.append(el('div', { className: 'foot' }, [msg, button('Back', chooser, 'quiet'), submit]));
     email.focus();
-  }
-
-  /* Device-code sign-in: show the code, then poll until the provider says the
-     user finished (or gave up). */
-  function device(p, state) {
-    sheet.textContent = '';
-    sheet.append(head(p.name, 'Finish signing in, then come back to this tab.'));
-    const msg = el('div', { className: 'msg', textContent: state.message || '' });
-    sheet.append(el('div', { className: 'body' }, [
-      el('h3', { textContent: 'Step 1 — open the sign-in page' }),
-      el('p', {}, el('a', { href: state.url, target: '_blank', rel: 'noreferrer',
-        textContent: state.url })),
-      el('h3', { textContent: 'Step 2 — enter this code' }),
-      el('div', { className: 'devcode', textContent: state.code }),
-      el('p', { className: 'pd', textContent:
-        `Sign in as ${state.email}. This page will notice when you are done.` }),
-    ]));
-    sheet.append(el('div', { className: 'foot' }, [
-      msg, el('button', { className: 'btn quiet', textContent: 'Close', onclick: closeSheet }),
-    ]));
-
-    const tick = async () => {
-      if (!$('#scrim')) return;               // the user closed the sheet
-      let st;
-      try { st = await api('account/oauth/status', {}); }
-      catch (e) { msg.textContent = e.message; msg.className = 'msg err'; return; }
-      if (st.running) { msg.textContent = st.message || 'Waiting…'; return setTimeout(tick, 2000); }
-      if (st.error) { msg.textContent = st.error; msg.className = 'msg err'; return; }
-      if (st.account) await connected(st.account);
-    };
-    setTimeout(tick, 2000);
   }
 
   async function connected(r) {
     closeSheet();
-    toast(`Connected ${r.label}. Sync it to build the index.`);
-    await reloadAll();
+    toast(`Connected ${r.label}. Fetching its headers now…`);
+    await reloadAll('overview');
+    startSync(false);
   }
 
   const chosen = preselect && providers.find((p) => p.key === preselect);
   if (chosen) form(chosen); else chooser();
 }
 
+/* Device-code sign-in: show the code, then poll until the provider says the
+   user finished (or gave up). Used both to add a mailbox and to sign in again. */
+function device(p, state, reauth) {
+  const sheet = $('.sheet') || openSheet(() => {});
+  sheet.textContent = '';
+  sheet.append(sheetTop(reauth ? 'Sign in again' : 'Add a mailbox', p.name || 'Outlook',
+    { sub: 'Finish signing in, then come back to this tab.' }));
+  const msg = el('span', { className: 'msg', textContent: state.message || '' });
+  sheet.append(el('div', { className: 'body' }, [
+    el('h3', { textContent: 'Step 1 — open the sign-in page' }),
+    el('p', {}, el('a', { href: state.url, target: '_blank', rel: 'noreferrer', textContent: state.url })),
+    el('h3', { textContent: 'Step 2 — enter this code' }),
+    el('div', { className: 'devcode', textContent: state.code }),
+    el('p', { className: 'dim', textContent: `Sign in as ${state.email}. This page notices when you are done.` }),
+  ]));
+  sheet.append(el('div', { className: 'foot' }, [msg, button('Close', closeSheet, 'quiet')]));
+  const tick = async () => {
+    if (!$('#scrim')) return;
+    let st;
+    try { st = await api('account/oauth/status', {}); }
+    catch (e) { msg.textContent = e.message; msg.className = 'msg err'; return; }
+    if (st.running) { msg.textContent = st.message || 'Waiting…'; return setTimeout(tick, 2000); }
+    if (st.error) { msg.textContent = st.error; msg.className = 'msg err'; return; }
+    if (st.account) {
+      closeSheet();
+      toast(st.message || 'Signed in.');
+      if (reauth) await refreshHeader();
+      else { await reloadAll('overview'); startSync(false); }
+    }
+  };
+  setTimeout(tick, 2000);
+}
+
+async function reauthOAuth(a) {
+  openSheet((s) => s.append(el('div', { className: 'body loading', textContent: 'Asking for a code…' })));
+  try { device({ name: a.provider_name }, await api('settings/oauth', {}), true); }
+  catch (e) { sheetError($('.sheet'), e.message); }
+}
+
 /* The setup steps arrive as plain text with bare URLs in them. */
 function linkify(text) {
   const out = el('div', { className: 'steps' });
   for (const part of String(text || '').split(/(https?:\/\/\S+)/g)) {
-    if (/^https?:\/\//.test(part)) {
-      out.append(el('a', { href: part, target: '_blank', rel: 'noreferrer',
-        textContent: part }));
-    } else if (part) out.append(document.createTextNode(part));
+    if (/^https?:\/\//.test(part)) out.append(el('a', { href: part, target: '_blank', rel: 'noreferrer', textContent: part }));
+    else if (part) out.append(document.createTextNode(part));
   }
   return out;
 }
 
-async function pollSync() {
+/* ---------- sync ---------- */
+async function startSync(full) {
+  const btn = $('#btn-sync');
+  btn.disabled = true;
+  btn.textContent = 'Syncing…';
+  try { await api('sync', { full }); pollSync(); }
+  catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Sync'; }
+}
+function pollSync() {
   const btn = $('#btn-sync');
   const tick = async () => {
-    const s = await api('sync/status', {});
-    if (s.error) toast(s.error, true);
-    else if (s.message) $('#headstat').textContent = s.message;
+    let s;
+    try { s = await api('sync/status', {}); } catch (e) { toast(e.message, true); return; }
+    if (s.message) $('#synced').textContent = s.message;
     if (s.running) return setTimeout(tick, 700);
+    if (s.error) toast(s.error, true, { label: 'Check connection', run: () => go('settings', { anchor: 'set-mailbox' }) });
     btn.disabled = false;
     btn.textContent = 'Sync';
     S.overview = null;
     await refreshHeader();
-    go(S.tab);
+    go(S.tab, { keepScroll: true });
   };
   tick();
 }
+$('#btn-sync').onclick = () => startSync(false);
 
-$('#btn-sync').onclick = async () => {
-  const btn = $('#btn-sync');
-  btn.disabled = true;
-  btn.textContent = 'Syncing…';
-  try { await api('sync', {}); pollSync(); }
-  catch (e) { toast(e.message, true); btn.disabled = false; btn.textContent = 'Sync'; }
+/* ---------- plain-English search ---------- */
+$('#ask').onsubmit = async (e) => {
+  e.preventDefault();
+  const input = $('#ask input');
+  const text = input.value.trim();
+  if (!text) return;
+  if (S.overview && S.overview.llm_provider === 'off') {
+    return toast('Describing mail in plain English uses the assistant, which is off.', false,
+                 { label: 'Set it up', run: () => go('settings', { anchor: 'set-llm' }) });
+  }
+  input.disabled = true;
+  try {
+    const r = await api('ask', { text });
+    openPreview({ kind: 'filter', value: r.filter }, 'archive', {
+      note: `Understood as: ${r.summary}.` + (r.explanation ? ` ${r.explanation}` : ''),
+      saveFilter: r.filter,
+    });
+  } catch (err) { toast(err.message, true); }
+  finally { input.disabled = false; }
 };
 
 refreshHeader().then(() => go('overview'));

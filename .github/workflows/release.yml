@@ -82,7 +82,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install . pyinstaller
+          pip install ".[claude]" pyinstaller
       # The certificate lives in a throwaway keychain for the life of the job,
       # and the identity is read back out of it rather than kept as a secret of
       # its own. The spec picks MACOS_CODESIGN_IDENTITY up from the environment.

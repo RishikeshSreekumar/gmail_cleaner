@@ -9,6 +9,7 @@ per folder so re-syncs stay incremental.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import time
 from email.utils import getaddresses, parsedate_to_datetime
@@ -30,6 +31,27 @@ def _addr_parts(header: str) -> tuple[str, str, str]:
     return name.strip(), addr, domain
 
 
+#: `<https://...>, <mailto:...>` - RFC 2369 wraps every target in angle brackets.
+UNSUB_TARGET = re.compile(r"<\s*([^>\s]+)\s*>")
+
+
+def unsubscribe_targets(header: str, post_header: str = "") -> tuple[str, int, str]:
+    """(https url, one-click supported, mailto) from the List-Unsubscribe headers.
+
+    Only https links are kept: RFC 8058 one-click requires https, and a plain
+    http link is not something this tool will ever fetch for you.
+    """
+    url, mailto = "", ""
+    for target in UNSUB_TARGET.findall(header or ""):
+        low = target.lower()
+        if low.startswith("https://") and not url:
+            url = target
+        elif low.startswith("mailto:") and not mailto:
+            mailto = target
+    one_click = int(bool(url) and "one-click" in (post_header or "").lower())
+    return url, one_click, mailto
+
+
 def normalize(raw: RawMessage, backend=None) -> dict:
     h = raw.headers
     name, addr, domain = _addr_parts(h.get("from", ""))
@@ -47,6 +69,9 @@ def normalize(raw: RawMessage, backend=None) -> dict:
     lower = [l.lower() for l in labels]
     ctype = (h.get("content-type") or "").lower()
     to_all = [a for _, a in getaddresses([h.get("to", ""), h.get("cc", "")]) if a]
+    unsub_url, unsub_post, unsub_mailto = unsubscribe_targets(
+        h.get("list-unsubscribe", ""), h.get("list-unsubscribe-post", "")
+    )
 
     return {
         "msg_key": raw.msg_key,
@@ -68,6 +93,9 @@ def normalize(raw: RawMessage, backend=None) -> dict:
         "is_important": int("\\important" in lower),
         "list_id": h.get("list-id", ""),
         "unsubscribe": int(bool(h.get("list-unsubscribe"))),
+        "unsub_url": unsub_url,
+        "unsub_post": unsub_post,
+        "unsub_mailto": unsub_mailto,
         "has_attachment": int("multipart/mixed" in ctype),
         "age_days": max(0, (int(time.time()) - ts) // 86400),
     }
@@ -76,7 +104,8 @@ def normalize(raw: RawMessage, backend=None) -> dict:
 COLUMNS = (
     "msg_key uid folder message_id thread_key received_at from_name from_email "
     "from_domain to_emails subject size labels is_unread is_inbox is_starred "
-    "is_important list_id unsubscribe has_attachment category subcategory "
+    "is_important list_id unsubscribe unsub_url unsub_post unsub_mailto "
+    "has_attachment category subcategory "
     "attention retention protected confidence reasons synced_at"
 ).split()
 
@@ -103,8 +132,40 @@ def load_rules(conn: sqlite3.Connection) -> list[dict]:
     return [dict(r) for r in conn.execute("SELECT * FROM rules")]
 
 
-def enrich(m: dict, rules: list[dict]) -> dict:
-    v = apply_rules(classify(m), rules, m)
+def correspondents(conn: sqlite3.Connection) -> set[str]:
+    """Everyone the account owner has sent mail to, from the indexed Sent mail.
+
+    Gmail's All Mail and the Sent folder on other providers are both indexed,
+    so this needs no extra fetch: it is every To/Cc on a message we wrote.
+    """
+    me = [e.lower() for e in (db.get_state(conn, "self_emails") or []) if e]
+    if not me:
+        return set()
+    marks = ",".join("?" * len(me))
+    out: set[str] = set()
+    for r in conn.execute(
+        f"SELECT to_emails FROM emails WHERE from_email IN ({marks})", me
+    ):
+        try:
+            out.update(a.lower() for a in json.loads(r["to_emails"] or "[]"))
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return out - set(me)
+
+
+def load_context(conn: sqlite3.Connection) -> dict:
+    """Everything the classifier needs beyond the message itself."""
+    return {
+        "locales": db.get_state(conn, "locales") or [],
+        "correspondents": correspondents(conn),
+    }
+
+
+def enrich(m: dict, rules: list[dict], ctx: dict | None = None) -> dict:
+    ctx = ctx or {}
+    v = apply_rules(
+        classify(m, ctx.get("locales"), ctx.get("correspondents")), rules, m
+    )
     m = dict(m)
     m.update(
         category=v.category,
@@ -151,13 +212,14 @@ def sync(conn, client, days: int, full: bool = False, progress=None) -> int:
     plan = {folder: _plan(conn, client, folder, days, full) for folder in folders}
     total = sum(len(uids) for uids, _ in plan.values())
     rules = load_rules(conn)
+    ctx = load_context(conn)
     done = 0
 
     for folder, (uids, highest) in plan.items():
         for i in range(0, len(uids), BATCH):
             chunk = uids[i : i + BATCH]
             raws = client.fetch_metadata(folder, chunk)
-            rows = [enrich(normalize(r, client), rules) for r in raws]
+            rows = [enrich(normalize(r, client), rules, ctx) for r in raws]
             if rows:
                 upsert(conn, rows)
                 highest = max(highest, max(r["uid"] for r in rows))
@@ -169,12 +231,17 @@ def sync(conn, client, days: int, full: bool = False, progress=None) -> int:
     db.set_state(conn, "folders", folders)
     db.set_state(conn, "last_sync", int(time.time()))
     db.set_state(conn, "sync_days", days)
+    if correspondents(conn) != ctx["correspondents"]:
+        # New Sent mail arrived, so earlier messages from those people may now
+        # deserve protection they did not get when they were first classified.
+        reclassify_all(conn)
     return total
 
 
 def reclassify_all(conn: sqlite3.Connection, progress=None) -> int:
     """Re-run the classifier over the existing index (after rule changes)."""
     rules = load_rules(conn)
+    ctx = load_context(conn)
     rows = conn.execute("SELECT * FROM emails").fetchall()
     now = int(time.time())
     updates = []
@@ -182,7 +249,7 @@ def reclassify_all(conn: sqlite3.Connection, progress=None) -> int:
         m = dict(r)
         m["labels"] = json.loads(m["labels"] or "[]")
         m["age_days"] = max(0, (now - (m["received_at"] or now)) // 86400)
-        e = enrich(m, rules)
+        e = enrich(m, rules, ctx)
         updates.append(
             (e["category"], e["subcategory"], e["attention"], e["retention"],
              e["protected"], e["confidence"], e["reasons"], e["msg_key"])

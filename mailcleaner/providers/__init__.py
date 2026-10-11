@@ -37,6 +37,8 @@ class Provider:
     #: Asked for at setup time because it varies per person/server.
     ask_host: bool = False
     web_url: str = ""
+    #: The page where the user creates the credential this provider needs.
+    setup_url: str = ""
     setup_help: str = ""
     notes: list[str] = field(default_factory=list)
 
@@ -114,6 +116,7 @@ PROVIDERS: dict[str, Provider] = {
     "gmail": Provider(
         key="gmail", name="Gmail", host="imap.gmail.com",
         backend=GmailBackend, web_url="https://mail.google.com/",
+        setup_url="https://myaccount.google.com/apppasswords",
         setup_help=GMAIL_HELP,
         notes=["Label-shaped: archive and trash never move a message."],
     ),
@@ -134,18 +137,22 @@ PROVIDERS: dict[str, Provider] = {
     "fastmail": Provider(
         key="fastmail", name="Fastmail", host="imap.fastmail.com",
         web_url="https://app.fastmail.com/mail/", setup_help=FASTMAIL_HELP,
+        setup_url="https://app.fastmail.com/settings/security/devicekeys",
     ),
     "icloud": Provider(
         key="icloud", name="iCloud Mail", host="imap.mail.me.com",
         web_url="https://www.icloud.com/mail/", setup_help=ICLOUD_HELP,
+        setup_url="https://account.apple.com/account/manage",
     ),
     "yahoo": Provider(
         key="yahoo", name="Yahoo Mail", host="imap.mail.yahoo.com",
         web_url="https://mail.yahoo.com/", setup_help=YAHOO_HELP,
+        setup_url="https://login.yahoo.com/account/security",
     ),
     "zoho": Provider(
         key="zoho", name="Zoho Mail", host="imap.zoho.com",
         web_url="https://mail.zoho.com/", setup_help=ZOHO_HELP,
+        setup_url="https://accounts.zoho.com/home#security/apppasswords",
     ),
     "imap": Provider(
         key="imap", name="Other IMAP server", ask_host=True,

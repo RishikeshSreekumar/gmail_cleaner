@@ -28,6 +28,8 @@ jobs:
         run: python tests/test_web.py
       - name: Provider tests (folders, MOVE guard, migration)
         run: python tests/test_providers.py
+      - name: Feature tests (rules, unsubscribe, LLM advisor, MCP, eval, schedule)
+        run: python tests/test_features.py
 
   no-permanent-delete:
     name: No permanent delete

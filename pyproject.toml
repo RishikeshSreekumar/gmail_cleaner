@@ -1,6 +1,6 @@
 [project]
 name = "mailcleaner"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local multi-account mailbox observability + cleanup dashboard (IMAP, metadata-only)"
 requires-python = ">=3.11"
 readme = "README.md"
@@ -26,6 +26,10 @@ dependencies = [
     "rich>=13.7",
     "keyring>=25.0",
 ]
+
+[project.optional-dependencies]
+# Only needed for the optional Anthropic LLM advisor (`mclean llm setup`).
+claude = ["anthropic>=1.0"]
 
 [project.urls]
 Homepage = "https://github.com/RishikeshSreekumar/gmail_cleaner"
