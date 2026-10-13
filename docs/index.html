@@ -1,0 +1,1267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mailcleaner, see who fills your inbox</title>
+<meta name="description" content="mailcleaner indexes your mail headers on your own computer, shows which senders fill your inbox, and cleans up in bulk with a preview first. It never permanently deletes. Open source.">
+<link rel="icon" href="mark-small.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-256.png">
+<meta name="theme-color" content="#f7f4ee">
+<meta property="og:title" content="mailcleaner">
+<meta property="og:description" content="See who fills your inbox. Clean it up safely. Runs on your computer, reads headers only, never deletes.">
+<meta property="og:image" content="social.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* The mailcleaner palette: warm paper, ink-brown text, one terracotta accent,
+     and a green that only ever means "protected". Light only, like the app. */
+  :root {
+    --paper: #f7f4ee;
+    --paper-2: #efe9df;
+    --card: #fffdf9;
+    --ink: #241e1a;
+    --ink-2: #4d443d;
+    --dim: #6c625a;
+    --line: #e3dbcf;
+    --line-2: #d6ccbe;
+    --accent: #9e4421;
+    --accent-d: #863718;
+    --accent-l: #f6e8df;
+    --green: #2b7440;
+    --green-bg: #e8f2ea;
+    --green-ln: #bcd8c3;
+    --night: #1f1915;
+    --night-2: #2a231e;
+    --on-night: #efe7dd;
+    --on-night-dim: #b5a99b;
+    --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
+    --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 17px/1.55 var(--sans); -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+  a:hover { color: var(--accent-d); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .num { font-variant-numeric: tabular-nums; }
+  code, .mono { font-family: var(--mono); }
+  code { font-size: .86em; background: var(--paper-2); border: 1px solid var(--line); padding: 1px 5px; border-radius: 5px; overflow-wrap: anywhere; }
+  .eyebrow { font: 500 12.5px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); margin: 0 0 18px; }
+
+  /* top bar */
+  .top { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+  .brand:hover { color: var(--ink); }
+  .brand img { width: 32px; height: 32px; display: block; }
+  .brand b { font-weight: 600; font-size: 21px; letter-spacing: -.02em; }
+  .top nav { display: flex; align-items: center; gap: 26px; font-size: 15px; }
+  .top nav a { color: var(--ink-2); text-decoration: none; }
+  .top nav a:hover { color: var(--ink); }
+  .top nav .pill { color: #fff; background: var(--ink); padding: 8px 15px; border-radius: 9px; font-weight: 500; }
+  .top nav .pill:hover { background: #3a302a; color: #fff; }
+
+  /* buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font: 500 16px/1 var(--sans); text-decoration: none; cursor: pointer;
+    height: 52px; padding: 0 22px; border-radius: 10px; border: 1px solid transparent;
+  }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn-accent:hover { background: var(--accent-d); color: #fff; }
+  .btn-line { color: var(--ink); border-color: var(--line-2); background: var(--card); }
+  .btn-line:hover { border-color: var(--ink-2); color: var(--ink); }
+
+  /* hero */
+  .hero { text-align: center; padding: 48px 0 40px; }
+  h1 {
+    font-weight: 600; font-size: clamp(40px, 6.4vw, 78px); line-height: 1.02;
+    letter-spacing: -.04em; margin: 0 auto 24px; max-width: 13em;
+  }
+  h1 em { font-style: normal; color: var(--accent); position: relative; white-space: nowrap; }
+  h1 em svg { display: inline-block; width: .5em; height: .5em; vertical-align: .32em; margin-left: .06em; }
+  .lede { font-size: 20px; color: var(--ink-2); max-width: 36em; margin: 0 auto 30px; }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 26px; }
+  .facts { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .facts li {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 14.5px; color: var(--ink-2);
+    background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px 6px 10px;
+  }
+  .facts svg { width: 16px; height: 16px; color: var(--green); flex: none; }
+  .fine { font-size: 14.5px; color: var(--dim); margin: 18px auto 0; max-width: 40em; }
+
+  /* ---------- the demo app ---------- */
+  .stage { padding: 24px 0 96px; }
+  .win {
+    border-radius: 14px; overflow: hidden; background: #f3efe8;
+    box-shadow: 0 0 0 1px rgba(36,30,26,.14), 0 40px 80px -40px rgba(36,30,26,.45), 0 10px 24px -14px rgba(36,30,26,.2);
+  }
+  .chrome { display: flex; align-items: center; gap: 14px; height: 42px; padding: 0 14px; background: #e9e3d9; border-bottom: 1px solid #d9d0c3; }
+  .lights { display: flex; gap: 7px; flex: none; }
+  .lights i { width: 11px; height: 11px; border-radius: 50%; background: #d1c6b8; }
+  .url {
+    flex: 1; max-width: 460px; margin: 0 auto; height: 26px; border-radius: 7px; background: #f7f4ee;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font: 12.5px var(--mono); color: var(--ink-2); white-space: nowrap; overflow: hidden;
+  }
+  .url .loc { font: 500 10.5px/1.5 var(--sans); text-transform: uppercase; letter-spacing: .06em; color: var(--green); background: var(--green-bg); border: 1px solid var(--green-ln); border-radius: 4px; padding: 1px 5px; }
+  .chrome .gap { width: 47px; flex: none; }
+
+  .app { container-type: inline-size; font-size: 13.5px; line-height: 1.45; color: var(--ink); background: #f7f4ee; position: relative; }
+  .a-head { display: flex; align-items: center; gap: 14px; height: 54px; padding: 0 18px; border-bottom: 1px solid var(--line); background: #faf8f4; }
+  .a-brand { display: flex; align-items: center; gap: 8px; width: 156px; flex: none; font-weight: 600; font-size: 15px; letter-spacing: -.02em; }
+  .a-brand img { width: 24px; height: 24px; }
+  .a-acct { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); flex: none; }
+  .a-dot { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; }
+  .a-ask { flex: 1 1 260px; max-width: 360px; height: 32px; border: 1px solid var(--line-2); border-radius: 8px; background: #fff; display: flex; align-items: center; gap: 8px; padding: 0 10px; color: #978b80; font-size: 12.5px; overflow: hidden; white-space: nowrap; }
+  .a-spacer { flex: 1; }
+  .a-mode {
+    display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; flex: none;
+    border: 1px solid var(--line-2); border-radius: 999px; background: #fff; font: 12.5px var(--sans); color: var(--ink-2); cursor: pointer;
+  }
+  .a-mode i { width: 7px; height: 7px; border-radius: 50%; background: #a99d91; }
+  .a-mode.on { border-color: #e2bfac; background: var(--accent-l); color: var(--accent-d); }
+  .a-mode.on i { background: var(--accent); }
+  .a-mode:focus-visible, .a-nav button:focus-visible, .chip:focus-visible, .row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .a-synced { font-size: 12px; color: var(--dim); white-space: nowrap; flex: none; }
+
+  .a-body { display: flex; height: 600px; position: relative; }
+  .a-nav { width: 174px; flex: none; padding: 16px 10px 16px 16px; overflow-y: auto; border-right: 1px solid transparent; }
+  .a-nav .gl { padding: 0 9px 5px; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: #8f8378; }
+  .a-nav .grp { margin-bottom: 14px; }
+  .a-nav button {
+    display: flex; align-items: center; justify-content: space-between; width: 100%; height: 29px; padding: 0 9px;
+    border: 0; border-radius: 7px; background: none; color: #4a413a; font: 13px var(--sans); text-align: left; cursor: pointer;
+  }
+  .a-nav button:hover { background: #ede7dd; }
+  .a-nav button.on { background: #e4dbcf; color: var(--night); font-weight: 500; }
+  .a-nav .count { font-size: 11px; color: var(--dim); }
+  .a-nav .note { margin-top: 8px; padding: 10px 9px 0; border-top: 1px solid var(--line); font-size: 11.5px; color: #8f8378; line-height: 1.5; }
+  .a-nav .note span { display: flex; align-items: center; gap: 6px; color: var(--green); }
+  .sw { width: 7px; height: 7px; border-radius: 2px; background: var(--green); display: inline-block; flex: none; }
+  .a-tabs { display: none; }
+
+  .a-main { flex: 1; min-width: 0; overflow-y: auto; padding: 22px 24px 90px 10px; overscroll-behavior: contain; }
+  .ph { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+  .ph h3 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.02em; }
+  .ph p { margin: 4px 0 0; color: var(--dim); font-size: 13px; max-width: 560px; }
+  .a-sec { margin-top: 26px; }
+  .a-sec h4 { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
+  .a-sec .sub { margin: 0 0 10px; color: var(--dim); font-size: 12.5px; }
+
+  .ov { display: grid; grid-template-columns: 1fr 1px 1fr auto; gap: 24px; align-items: start; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .ov .k { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #8f8378; margin-bottom: 5px; }
+  .ov .fig { font-size: 34px; font-weight: 600; letter-spacing: -.03em; line-height: 1; }
+  .ov .u { font-size: 12.5px; color: var(--dim); margin-top: 7px; }
+  .ov .vr { align-self: stretch; background: var(--line); }
+  .ov > .abtn { align-self: end; }
+  .stack { display: flex; height: 30px; border-radius: 7px; overflow: hidden; border: 1px solid var(--line); }
+  .stack div { display: flex; align-items: center; justify-content: center; font: 10.5px var(--mono); color: #4a3c30; overflow: hidden; white-space: nowrap; transition: width .4s ease; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 8px; height: 8px; border-radius: 2px; }
+  .legend b { font-weight: 400; color: var(--dim); }
+
+  .tbl { border: 1px solid var(--line); border-radius: 10px; background: #fffdfa; overflow: hidden; }
+  .tr { display: grid; grid-template-columns: var(--cols); gap: 12px; align-items: center; padding: 0 14px; min-height: 40px; }
+  .tr + .tr { border-top: 1px solid #eee8de; }
+  .th { min-height: 34px; font-size: 11.5px; color: #8f8378; background: #faf7f2; }
+  .row { cursor: pointer; }
+  .row:hover { background: #f8f3eb; }
+  .r { text-align: right; }
+  .snd { min-width: 0; }
+  .snd .a { font: 12.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .snd .bar { height: 3px; border-radius: 2px; background: #eadfce; margin-top: 4px; }
+  .prot1 { color: var(--green); }
+  .prot0 { color: #a99d91; }
+  .trend { font-size: 12px; white-space: nowrap; }
+  .t-up { color: #a24a24; } .t-down { color: var(--green); } .t-flat { color: #a99d91; }
+  .cb { width: 15px; height: 15px; accent-color: var(--accent); margin: 0; }
+  .st { --cols: minmax(0,1fr) 60px 60px 48px 74px 70px; }
+  .st.cbx { --cols: 18px minmax(0,1fr) 60px 60px 48px 74px 70px; }
+  @container (max-width: 640px) {
+    .c-wk, .c-tr { display: none; }
+    .st { --cols: minmax(0,1fr) 52px 52px 62px; }
+    .st.cbx { --cols: 18px minmax(0,1fr) 52px 52px 62px; }
+  }
+  @container (max-width: 440px) {
+    .c-un { display: none; }
+    .st { --cols: minmax(0,1fr) 52px 62px; }
+    .st.cbx { --cols: 18px minmax(0,1fr) 52px 62px; }
+  }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .chip { height: 30px; padding: 0 11px; border: 1px solid var(--line-2); border-radius: 8px; background: #fff; font: 12.5px var(--sans); color: var(--ink-2); cursor: pointer; }
+  .chip.on { border-color: var(--accent); background: var(--accent-l); color: var(--accent-d); font-weight: 500; }
+  .toolbar .cnt { margin-left: auto; font-size: 12px; color: var(--dim); }
+
+  .notice { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px; background: #faf8f4; font-size: 12.5px; color: var(--ink-2); }
+
+  .abtn { display: inline-flex; align-items: center; justify-content: center; height: 30px; padding: 0 12px; border: 1px solid var(--line-2); border-radius: 8px; background: #fff; font: 500 12.5px var(--sans); color: var(--ink-2); cursor: pointer; white-space: nowrap; }
+  .abtn:hover:not(:disabled) { border-color: #a99d91; }
+  .abtn:disabled { opacity: .45; cursor: default; }
+  .abtn:focus-visible, .cb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .abtn:focus:not(:focus-visible) { outline: none; }
+  .abtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .abtn.primary:hover:not(:disabled) { background: var(--accent-d); }
+  .abtn.link { border: 0; background: none; color: var(--accent); padding: 0; height: auto; }
+  .abtn.big { height: 36px; padding: 0 16px; font-size: 13px; }
+  .abtns { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  .batch { display: grid; grid-template-columns: 1fr 84px 84px 104px; gap: 12px; align-items: center; padding: 13px 16px; border: 1px solid var(--line); border-radius: 10px; background: #fffdfa; }
+  .batch + .batch { margin-top: 8px; }
+  .batch .t { font-weight: 600; font-size: 13.5px; }
+  .batch .d { color: var(--dim); font-size: 12.5px; }
+  .batch .big { font-size: 17px; font-weight: 600; letter-spacing: -.02em; text-align: right; }
+  .batch .cap { font-size: 11px; color: #8f8378; text-align: right; }
+  .batch.done { opacity: .5; }
+  @container (max-width: 640px) { .batch { grid-template-columns: 1fr 74px; } .batch .hide-s { display: none; } .batch .abtns { grid-column: 1 / -1; justify-content: flex-start !important; } }
+  .safe { display: flex; gap: 10px; align-items: center; margin-top: 12px; padding: 11px 14px; border: 1px solid var(--green-ln); border-radius: 10px; background: var(--green-bg); font-size: 12.5px; color: #24563a; }
+
+  .selbar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(640px, calc(100% - 24px)); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: space-between; padding: 10px 12px 10px 16px; border-radius: 12px; background: var(--night); color: var(--on-night); font-size: 12.5px; box-shadow: 0 14px 30px -10px rgba(0,0,0,.4); z-index: 4; }
+  .selbar .abtn { background: transparent; color: var(--on-night); border-color: #5a4e45; }
+  .selbar .abtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .scrim { position: absolute; inset: 0; background: rgba(36,30,26,.32); display: flex; align-items: center; justify-content: center; padding: 14px; z-index: 6; }
+  .sheet { width: min(600px, 100%); max-height: 100%; display: flex; flex-direction: column; background: #fffdfa; border-radius: 13px; box-shadow: 0 30px 60px -20px rgba(0,0,0,.45); overflow: hidden; }
+  .sh-top { padding: 16px 20px 14px; border-bottom: 1px solid var(--line); }
+  .sh-top .k { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #8f8378; }
+  .sh-top .ttl { font: 500 15px var(--mono); margin: 3px 0 12px; overflow-wrap: anywhere; }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .stats b { display: block; font-size: 19px; font-weight: 600; letter-spacing: -.02em; }
+  .stats span { font-size: 11.5px; color: var(--dim); }
+  @container (max-width: 520px) { .stats { grid-template-columns: 1fr 1fr; } }
+  .sh-body { padding: 14px 20px; overflow-y: auto; }
+  .sh-body h5 { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; }
+  .sh-body h5 + * { margin-bottom: 14px; }
+  .cats { display: flex; height: 10px; border-radius: 4px; overflow: hidden; }
+  .subj { font-size: 12.5px; }
+  .subj div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid #eee8de; }
+  .subj div:first-child { border-top: 0; }
+  .subj span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .subj span:last-child { color: var(--dim); flex: none; }
+  .sh-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; padding: 12px 20px; border-top: 1px solid var(--line); background: #faf7f2; }
+  .sh-foot .msg { margin-right: auto; font-size: 12.5px; color: var(--dim); }
+
+  .toast { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 16px; border-radius: 10px; background: var(--night); color: var(--on-night); font-size: 12.5px; z-index: 8; white-space: nowrap; max-width: calc(100% - 24px); }
+  .toast span { overflow: hidden; text-overflow: ellipsis; }
+  .toast button { border: 0; background: none; color: #f0a37f; font: 600 12.5px var(--sans); cursor: pointer; }
+
+  .stub { border: 1px dashed var(--line-2); border-radius: 10px; padding: 18px; color: var(--ink-2); font-size: 13px; background: #faf8f4; }
+
+  .stage-note { display: flex; gap: 10px; justify-content: center; align-items: center; margin: 16px auto 0; color: var(--dim); font-size: 14px; text-align: center; max-width: 44em; }
+
+  @container (max-width: 760px) {
+    .a-nav { display: none; }
+    .a-tabs { display: flex; gap: 4px; overflow-x: auto; padding: 8px 12px; border-bottom: 1px solid var(--line); background: #faf8f4; scrollbar-width: none; }
+    .a-tabs::-webkit-scrollbar { display: none; }
+    .a-tabs button { flex: none; border: 0; background: none; border-radius: 7px; height: 28px; padding: 0 10px; font: 12.5px var(--sans); color: #4a413a; cursor: pointer; }
+    .a-tabs button.on { background: #e4dbcf; color: var(--night); font-weight: 500; }
+    .a-main { padding: 16px 14px 90px; }
+    .a-ask, .a-synced, .a-acct .who { display: none; }
+    .a-brand { width: auto; }
+    .ov { grid-template-columns: 1fr 1fr; }
+    .ov .vr { display: none; }
+    .ov > .abtn { grid-column: 1 / -1; justify-self: start; }
+    .ov .fig { font-size: 26px; }
+  }
+
+  /* ---------- page sections ---------- */
+  section { padding: 104px 0; }
+  h2 { font-weight: 600; font-size: clamp(32px, 4.4vw, 52px); line-height: 1.04; letter-spacing: -.035em; margin: 0 0 20px; }
+  h3 { font-weight: 600; font-size: 24px; line-height: 1.2; letter-spacing: -.02em; margin: 0 0 12px; }
+  .intro { font-size: 19px; color: var(--ink-2); max-width: 34em; margin: 0; }
+
+  /* how it works */
+  .how { border-top: 1px solid var(--line); }
+  .steps4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 52px 0 0; padding: 0; }
+  .steps4 li { list-style: none; padding: 0 26px 0 0; position: relative; }
+  .steps4 li + li { padding-left: 26px; border-left: 1px solid var(--line); }
+  .steps4 .n { font: 500 13px var(--mono); color: var(--accent); display: block; margin-bottom: 14px; }
+  .steps4 h4 { font-size: 18px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 8px; }
+  .steps4 p { margin: 0; font-size: 15.5px; color: var(--ink-2); }
+  .terminal {
+    margin-top: 52px; border-radius: 12px; background: var(--night); color: var(--on-night); padding: 20px 22px;
+    font: 14px/1.7 var(--mono); overflow-x: auto; max-width: 720px;
+  }
+  .terminal .p { color: #f0a37f; user-select: none; }
+  .terminal .d { color: var(--on-night-dim); }
+
+  /* safety, on night */
+  .safety { background: var(--night); color: var(--on-night); }
+  .safety .eyebrow { color: #f0a37f; }
+  .safety .intro { color: var(--on-night-dim); }
+  .safety a { color: #f0a37f; }
+  .safety code { background: #332a24; border-color: #4a3f37; color: var(--on-night); }
+  .safe-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 64px; margin-top: 56px; align-items: start; }
+  .hdr {
+    border-radius: 12px; background: #fffdf9; color: var(--ink); overflow: hidden;
+    font: 13px/1.6 var(--mono); box-shadow: 0 30px 60px -30px rgba(0,0,0,.6);
+  }
+  .hdr .cap { display: flex; justify-content: space-between; padding: 10px 16px; background: #efe9df; font: 500 11.5px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+  .hdr .cap b { color: var(--green); font-weight: 600; }
+  .hdr dl { margin: 0; padding: 12px 16px; display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; }
+  .hdr dt { color: var(--accent); }
+  .hdr dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .hdr .body {
+    position: relative; height: 170px; border-top: 1px dashed var(--line-2);
+    background: repeating-linear-gradient(-45deg, #f3eee6 0 8px, #ebe4d9 8px 16px);
+    display: grid; place-items: center; text-align: center; padding: 16px;
+  }
+  .hdr .body span { background: #fffdf9; border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 14px; font: 13px/1.4 var(--sans); color: var(--ink-2); }
+  .hdr .body b { display: block; color: var(--ink); font-weight: 600; }
+  .hdr-note { margin: 18px 0 0; font-size: 14.5px; color: var(--on-night-dim); }
+
+  .rules { list-style: none; margin: 0; padding: 0; }
+  .rules li { display: grid; grid-template-columns: 28px 1fr; gap: 4px 14px; padding: 18px 0; border-top: 1px solid #3a312a; }
+  .rules li:first-child { border-top: 0; padding-top: 0; }
+  .rules svg { width: 20px; height: 20px; margin-top: 3px; color: #f0a37f; }
+  .rules b { font-size: 17px; font-weight: 600; }
+  .rules p { grid-column: 2; margin: 0; font-size: 15px; color: var(--on-night-dim); }
+
+  /* features */
+  .feat { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 64px; align-items: start; padding-top: 88px; }
+  .feat.flip > :first-child { order: 2; }
+  .feat p { color: var(--ink-2); margin: 0 0 14px; }
+  .feat .note { font-size: 14.5px; color: var(--dim); }
+  .tag { font: 500 12.5px var(--mono); color: var(--dim); display: block; margin-bottom: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px; box-shadow: 0 18px 40px -30px rgba(36,30,26,.4); }
+  .card h5 { margin: 0 0 12px; font-size: 12px; letter-spacing: .07em; text-transform: uppercase; color: var(--dim); font-weight: 500; }
+
+  .prov { width: 100%; border-collapse: collapse; font-size: 15px; }
+  .prov th { text-align: left; font: 500 12px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--dim); padding: 0 12px 10px 0; }
+  .prov td { padding: 12px 12px 12px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  .prov td:first-child { font-weight: 600; white-space: nowrap; }
+  .prov td:last-child { color: var(--ink-2); font-size: 14px; }
+
+  .catgrid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cat { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-2); background: #fff; font-size: 14px; }
+  .cat.p { border-color: var(--green-ln); background: var(--green-bg); color: #24563a; }
+  .dims { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+  .dims div { border-top: 2px solid var(--ink); padding-top: 10px; }
+  .dims b { display: block; font-size: 15px; }
+  .dims span { display: block; font-size: 13.5px; line-height: 1.45; color: var(--ink-2); }
+  .legendp { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 13.5px; color: var(--green); }
+
+  .rule { font-size: 15px; }
+  .rule .line { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); align-items: baseline; }
+  .rule .line:first-of-type { border-top: 0; padding-top: 0; }
+  .rule .line > span:first-child { font: 500 12px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--dim); }
+  .rule .tok { display: inline-block; font: 13px var(--mono); background: var(--paper-2); border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; margin: 2px 2px 2px 0; }
+  .rule .tok.act { background: var(--accent-l); border-color: #e2bfac; color: var(--accent-d); }
+  .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 9px; padding: 2px; background: var(--paper); }
+  .seg button { border: 0; background: none; height: 28px; padding: 0 12px; border-radius: 7px; font: 500 13px var(--sans); color: var(--ink-2); cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(36,30,26,.15); }
+  .rule .out { margin: 14px 0 0; font-size: 14px; color: var(--ink-2); min-height: 3em; }
+  .actrow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+  .actrow span { font-size: 13px; padding: 3px 9px; border-radius: 6px; border: 1px solid var(--line); background: #fff; }
+  .actrow s { font-size: 13px; padding: 3px 9px; border-radius: 6px; border: 1px dashed var(--line-2); color: var(--dim); }
+
+  .flow { list-style: none; margin: 0; padding: 0; counter-reset: f; }
+  .flow li { counter-increment: f; display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); font-size: 15px; color: var(--ink-2); }
+  .flow li:first-child { border-top: 0; padding-top: 0; }
+  .flow li::before { content: counter(f); width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 500 12px var(--mono); background: var(--paper-2); color: var(--ink); }
+  .flow b { color: var(--ink); font-weight: 600; }
+
+  .sent { font-size: 14.5px; }
+  .sent .yes, .sent .no { display: grid; grid-template-columns: 22px 1fr; gap: 8px; padding: 7px 0; }
+  .sent .yes { color: var(--ink-2); }
+  .sent .no { color: var(--dim); }
+  .sent .yes::before { content: "→"; color: var(--accent); font-family: var(--mono); }
+  .sent .no::before { content: "×"; color: var(--dim); font-family: var(--mono); }
+  .provsw { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  .provsw div { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: #fff; }
+  .provsw b { display: block; font-size: 15px; }
+  .provsw span { display: block; font-size: 13.5px; line-height: 1.45; color: var(--ink-2); margin-top: 2px; }
+
+  .smalls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 36px; margin-top: 88px; }
+  .small { padding: 24px 0; border-top: 1px solid var(--ink); }
+  .small .n { font: 500 12px var(--mono); color: var(--accent); display: block; margin-bottom: 10px; }
+  .small h4 { font-size: 18px; font-weight: 600; letter-spacing: -.01em; margin: 0 0 8px; }
+  .small p { margin: 0; font-size: 15px; color: var(--ink-2); }
+
+  /* install */
+  .install { border-top: 1px solid var(--line); }
+  .inst-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 64px; align-items: start; margin-top: 8px; }
+  .tabs { display: flex; gap: 4px; margin: 32px 0 0; }
+  .tabs button { border: 1px solid var(--line); border-bottom: 0; background: var(--paper-2); border-radius: 9px 9px 0 0; height: 36px; padding: 0 14px; font: 500 14px var(--sans); color: var(--ink-2); cursor: pointer; }
+  .tabs button[aria-selected="true"] { background: var(--night); color: var(--on-night); border-color: var(--night); }
+  .cmd { position: relative; background: var(--night); color: var(--on-night); border-radius: 0 10px 10px 10px; padding: 18px 64px 18px 20px; font: 14px/1.6 var(--mono); }
+  .cmd code { background: none; border: 0; padding: 0; font-size: inherit; color: inherit; overflow-wrap: anywhere; }
+  .cmd .p { color: #f0a37f; user-select: none; }
+  .copy { position: absolute; top: 12px; right: 12px; height: 30px; padding: 0 10px; border-radius: 7px; border: 1px solid #4a3f37; background: #2f2721; color: var(--on-night); font: 500 12.5px var(--sans); cursor: pointer; }
+  .copy:hover { border-color: #7a6b5e; }
+  .isteps { list-style: none; margin: 30px 0 0; padding: 0; counter-reset: s; }
+  .isteps li { counter-increment: s; position: relative; padding: 0 0 22px 48px; }
+  .isteps li::before { content: counter(s); position: absolute; left: 0; top: -1px; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font: 500 14px var(--mono); background: var(--card); border: 1px solid var(--line-2); }
+  .isteps b { display: block; font-size: 17px; font-weight: 600; }
+  .isteps span { color: var(--ink-2); font-size: 15.5px; }
+  .other { font-size: 15px; color: var(--dim); margin: 6px 0 0; }
+
+  /* the stamp */
+  .stamp {
+    padding: 12px; filter: drop-shadow(0 22px 30px rgba(36,30,26,.18)) drop-shadow(0 1px 1px rgba(36,30,26,.12));
+    background: radial-gradient(circle at 8px 8px, transparent 5.5px, var(--card) 6px) -8px -8px / 16px 16px;
+  }
+  .stamp-in { background: var(--card); border: 1.5px solid var(--accent); padding: 28px 28px 26px; position: relative; overflow: hidden; }
+  .stamp .row1 { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; position: relative; }
+  .stamp .row1 img { width: 72px; height: 72px; flex: none; }
+  .stamp-name { font-weight: 600; font-size: 34px; line-height: 1; letter-spacing: -.03em; }
+  .stamp .sub { font: 500 12.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 8px 0 0; }
+  .stamp ul { list-style: none; margin: 0 0 24px; padding: 0; border-top: 1px dashed var(--line-2); }
+  .stamp li { padding: 9px 0 9px 26px; position: relative; font-size: 15.5px; border-bottom: 1px dashed var(--line-2); }
+  .stamp li::before { content: ""; position: absolute; left: 3px; top: 15px; width: 11px; height: 6px; border-left: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transform: rotate(-45deg); }
+  .stamp .btn { width: 100%; }
+  .postmark { position: absolute; right: -18px; top: -14px; width: 112px; height: 112px; color: rgba(158,68,33,.16); transform: rotate(-14deg); pointer-events: none; }
+  .coffee { color: var(--ink-2); font-size: 15px; margin: 22px 0 14px; padding-top: 20px; border-top: 1px solid var(--line); }
+  /* Buy Me a Coffee widget. Its script writes .bmc-btn in place; these only lay it out. */
+  .cta .bmc-btn-container { display: inline-flex; }
+  .cta .bmc-btn { height: 52px !important; border-radius: 10px !important; }
+  .bmc-btn { box-shadow: 0 2px 0 #8c3bc9; }
+  .bmc-btn:hover { filter: brightness(1.06); }
+  .stamp .bmc-btn-container { display: block; }
+  .stamp .bmc-btn { width: 100%; justify-content: center; }
+  .stamp .bmc-btn-text { width: auto !important; }
+  .bmc-fallback { display: none !important; }
+  .bmc-fallback.show { display: inline-flex !important; }
+
+  /* faq */
+  .faq-sec { border-top: 1px solid var(--line); }
+  .faq { margin-top: 40px; max-width: 800px; }
+  details { border-top: 1px solid var(--line); }
+  details:last-child { border-bottom: 1px solid var(--line); }
+  summary { cursor: pointer; list-style: none; padding: 20px 44px 20px 0; position: relative; font-weight: 500; font-size: 18px; letter-spacing: -.01em; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: ""; position: absolute; right: 8px; top: 27px; width: 9px; height: 9px; border-right: 1.75px solid var(--accent); border-bottom: 1.75px solid var(--accent); transform: rotate(45deg); transition: transform .2s; }
+  details[open] summary::after { transform: rotate(-135deg); top: 31px; }
+  details p { margin: 0 0 20px; color: var(--ink-2); max-width: 42em; }
+
+  footer { border-top: 1px solid var(--line); padding: 34px 0 56px; font-size: 14px; color: var(--dim); }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center; }
+  footer a { color: var(--ink-2); }
+
+  @media (max-width: 900px) {
+    .safe-grid, .feat, .inst-grid { grid-template-columns: 1fr; gap: 40px; }
+    .feat.flip > :first-child { order: 0; }
+    .steps4 { grid-template-columns: 1fr 1fr; gap: 32px 0; }
+    .steps4 li:nth-child(3) { padding-left: 0; border-left: 0; }
+    .smalls { grid-template-columns: 1fr 1fr; }
+    section { padding: 80px 0; }
+    .feat { padding-top: 64px; }
+  }
+  @media (max-width: 600px) {
+    .wrap { padding: 0 16px; }
+    .top nav a:not(.pill) { display: none; }
+    .hero { padding-top: 28px; }
+    .lede { font-size: 18px; }
+    .steps4 { grid-template-columns: 1fr; }
+    .steps4 li, .steps4 li + li { padding: 0 0 0 0; border-left: 0; }
+    .smalls { grid-template-columns: 1fr; }
+    .a-body { height: 560px; }
+    .chrome .gap, .lights { display: none; }
+    .url .tok { display: none; }
+    .stamp-name { font-size: 28px; }
+    .stamp-in { padding: 24px 20px 22px; }
+    .postmark { right: -22px; width: 92px; height: 92px; }
+    .provsw { grid-template-columns: 1fr; }
+    .prov td:first-child { white-space: normal; }
+    .cta .btn, .cta .bmc-btn-container { width: 100%; }
+    .cta .bmc-btn { width: 100%; justify-content: center; }
+    .cta .bmc-btn-text { width: auto !important; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="#"><img src="mark.svg" alt=""><b>mailcleaner</b></a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#safety">Safety</a>
+      <a href="#features">Features</a>
+      <a href="#faq">FAQ</a>
+      <a class="pill" href="#install">Install</a>
+    </nav>
+  </header>
+
+  <main class="hero">
+    <h1>See who fills your inbox. Clean it up <em>safely.<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 4.5L20 5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></em></h1>
+    <p class="lede">mailcleaner indexes the headers of your mail on your own computer, shows you which senders are filling it up, and lets you archive, trash or unsubscribe in bulk. Every action shows a preview first. Nothing is ever permanently deleted.</p>
+    <div class="cta">
+      <a class="btn btn-accent" href="#install">
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v9m0 0L4.5 7M8 10.5L11.5 7M2 14h12" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Install mailcleaner
+      </a>
+      <a class="btn btn-line" id="bmcHero" href="https://buymeacoffee.com/srishi">Buy me a coffee</a>
+    </div>
+    <ul class="facts">
+      <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Runs on your computer</li>
+      <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Reads headers only</li>
+      <li><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Never deletes</li>
+    </ul>
+    <p class="fine">Open source, for macOS, Linux and Windows. Works with Gmail, Outlook, Proton Mail, Fastmail, iCloud, Yahoo, Zoho and any IMAP server.</p>
+  </main>
+
+  <div class="stage">
+    <div class="win" aria-label="Interactive preview of the mailcleaner browser app">
+      <div class="chrome">
+        <div class="lights"><i></i><i></i><i></i></div>
+        <div class="url"><span class="loc">local</span><span>127.0.0.1:8765<span class="tok">/?token=••••••••</span></span></div>
+        <div class="gap"></div>
+      </div>
+      <div class="app" id="app">
+        <div class="a-head">
+          <div class="a-brand"><img src="mark.svg" alt="">mailcleaner</div>
+          <div class="a-acct"><span class="a-dot">Y</span><span class="who">you@gmail.com</span></div>
+          <div class="a-ask"><svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>Ask: unread newsletters older than a year</div>
+          <div class="a-spacer"></div>
+          <button class="a-mode" id="mode" type="button" aria-pressed="false"><i></i><span>Read-only</span></button>
+          <div class="a-synced">Synced 2 min ago</div>
+        </div>
+        <div class="a-tabs" id="tabs"></div>
+        <div class="a-body" id="abody">
+          <div class="a-nav" id="nav"></div>
+          <div class="a-main" id="amain"></div>
+        </div>
+      </div>
+    </div>
+    <p class="stage-note">A made-up mailbox in the real layout. It starts read-only, like the app does. Click a sender to see the preview, then click the Read-only pill to turn on actions.</p>
+  </div>
+</div>
+
+<section class="how" id="how">
+  <div class="wrap">
+    <p class="eyebrow">How it works</p>
+    <h2>Type <span class="mono" style="letter-spacing:-.04em">mclean</span>.<br>Your browser does the rest.</h2>
+    <p class="intro">mailcleaner opens a page served from your own computer. Everything happens there, and you never need another command.</p>
+    <ol class="steps4">
+      <li><span class="n">01</span><h4>Add a mailbox</h4><p>Pick your provider. The page shows its setup steps and links to where you create an app password, or for Outlook, gives you a code to sign in with. Add as many as you like.</p></li>
+      <li><span class="n">02</span><h4>Look around</h4><p>It syncs headers right away. Overview, Attention, Senders, Cleanup, Domains, Categories and Age show where your mail comes from.</p></li>
+      <li><span class="n">03</span><h4>Turn on actions</h4><p>When you're ready, click the Read-only pill. Archive, trash, label, mark read and unsubscribe unlock, and every bulk action still shows a preview first.</p></li>
+      <li><span class="n">04</span><h4>Automate</h4><p>Save searches as rules, unsubscribe from the loud senders, and if you want, let the optional Assistant suggest what to protect or ignore.</p></li>
+    </ol>
+    <div class="terminal" aria-label="Example terminal session">
+      <div><span class="p">$ </span>mclean</div>
+      <div class="d">mailcleaner is running at http://127.0.0.1:8765/?token=…</div>
+      <div class="d">Keep this window open. Ctrl-C stops it.</div>
+    </div>
+  </div>
+</section>
+
+<section class="safety" id="safety">
+  <div class="wrap">
+    <p class="eyebrow">Safety</p>
+    <h2>It works on your real mailbox,<br>so it's careful about it.</h2>
+    <p class="intro">These aren't settings. They're rules the code is built around, and the project's contributing guide refuses changes that break them.</p>
+
+    <div class="safe-grid">
+      <div>
+        <div class="hdr" aria-label="What mailcleaner reads from one email">
+          <div class="cap"><span>One message, as mailcleaner sees it</span><b>Indexed</b></div>
+          <dl>
+            <dt>From</dt><dd>The Weekly Brief &lt;weekly@thebrief.news&gt;</dd>
+            <dt>To</dt><dd>you@gmail.com</dd>
+            <dt>Subject</dt><dd>12 stories you missed this week</dd>
+            <dt>Date</dt><dd>Tue, 6 Oct 2026 07:02</dd>
+            <dt>List</dt><dd>List-Unsubscribe, one-click</dd>
+            <dt>Size</dt><dd>84 KB</dd>
+            <dt>Labels</dt><dd>Inbox, Unread</dd>
+          </dl>
+          <div class="body"><span><b>Body and attachments</b>Not fetched. Not stored.</span></div>
+        </div>
+        <p class="hdr-note">Sync fetches headers, flags, labels and size into a SQLite file in <code>~/.mailcleaner</code>, one per mailbox. A body is fetched only when you ask to preview one message, and it's never saved. Your mail server stays the source of truth: delete the index and the next sync rebuilds it.</p>
+      </div>
+
+      <ul class="rules">
+        <li>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.5 15.5l11-11" stroke="currentColor" stroke-width="1.7"/></svg>
+          <b>No permanent delete, anywhere</b>
+          <p>"Trash" means your provider's own Trash, where you can still get it back. The app never sends <code>EXPUNGE</code> and never sets <code>\Deleted</code>, and CI rejects code that tries. If a server can't <code>MOVE</code>, archive and trash are refused rather than faked with copy-then-delete.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3.5" y="8.5" width="13" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M6.5 8.5V6a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+          <b>Read-only until you say so</b>
+          <p>Each mailbox starts read-only. Turning actions on asks you to confirm. Turning them off doesn't.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5l6 2.5v4.5c0 4-2.6 6.7-6 8-3.4-1.3-6-4-6-8V5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <b>Protected mail stays out of bulk actions</b>
+          <p>Finance, security, travel, orders, people you write to, and anything starred. Unread mail with a deadline in it stays protected until you've read it.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M1.5 10S4.5 4 10 4s8.5 6 8.5 6-3 6-8.5 6-8.5-6-8.5-6z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="10" cy="10" r="2.6" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+          <b>A preview before every bulk action</b>
+          <p>How many messages, the date span, what categories they are, how many protected ones were left out, and examples. Then you decide.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 7h8.5a4.5 4.5 0 0 1 0 9H8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M7 3.5L3.5 7 7 10.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <b>Everything is logged and undoable</b>
+          <p>Every batch lands in History. Undo is one click there, or straight from the toast after you act.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="6" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="11.5" y="3.5" width="6" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+          <b>Mailboxes never mix</b>
+          <p>Each one has its own index, rules, history and credential. No query in the app spans two mailboxes.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h14M10 3c2 2 3 4.4 3 7s-1 5-3 7c-2-2-3-4.4-3-7s1-5 3-7z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>
+          <b>Nothing phones home</b>
+          <p>No telemetry, analytics or crash reports. The page is bound to <code>127.0.0.1</code> and needs a one-time token on every request. The only outside connections are your mail server, an unsubscribe you confirmed, and an AI provider you chose to set up.</p>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <p class="eyebrow">What's in it</p>
+    <h2>Where your mail comes from,<br>and what to do about it.</h2>
+    <p class="intro">The overview tells you how big the problem is. The rest of the app helps you shrink it, a batch at a time.</p>
+
+    <div class="feat">
+      <div>
+        <span class="tag">01 / PROVIDERS</span>
+        <h3>Gmail, and nearly everything else.</h3>
+        <p>Add as many mailboxes as you like, from different providers, and switch between them from the menu next to the logo.</p>
+        <p>For Gmail there's no Google Cloud project, OAuth client or consent screen. You make an app password, and if you revoke it, mailcleaner loses all access. Passwords go to your system keychain.</p>
+        <p class="note">On Gmail, actions change labels and messages never move. Everywhere else a message lives in one folder, so labelling files it into the folder you name, and undo moves it back.</p>
+      </div>
+      <div class="card">
+        <table class="prov">
+          <thead><tr><th>Provider</th><th>Sign-in</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Gmail</td><td>App password</td><td>Needs 2-Step Verification and IMAP turned on</td></tr>
+            <tr><td>Outlook, Microsoft 365</td><td>Code in the browser</td><td>Microsoft turned off IMAP passwords, so you sign in on their site</td></tr>
+            <tr><td>Proton Mail</td><td>Bridge password</td><td>Needs Proton Mail Bridge running, which is a paid plan</td></tr>
+            <tr><td>Fastmail, iCloud, Yahoo, Zoho</td><td>App password</td><td>Standard IMAP</td></tr>
+            <tr><td>Any IMAP server</td><td>Password</td><td>You enter the host, port and TLS mode</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="feat flip">
+      <div>
+        <span class="tag">02 / CLASSIFIER</span>
+        <h3>Sorted offline, without an AI model.</h3>
+        <p>Every message gets a category, how much attention it wants now, and what should happen to it. The rules are plain heuristics: list headers, the sender's address, known domains, subject keywords, your provider's own labels, starred and age.</p>
+        <p>It also reads your Sent mail. Anyone you've written to counts as a correspondent and is protected, unless they're a mailing list.</p>
+        <p class="note">Subject keywords come in packs for English, India, US, UK, German, French and Spanish mail. Settings has an accuracy check: correct thirty random messages and it scores itself, with missed protection reported first.</p>
+      </div>
+      <div class="card">
+        <h5>Categories</h5>
+        <div class="catgrid">
+          <span class="cat p"><i class="sw"></i>finance</span>
+          <span class="cat p"><i class="sw"></i>security</span>
+          <span class="cat p"><i class="sw"></i>travel</span>
+          <span class="cat p"><i class="sw"></i>orders</span>
+          <span class="cat p"><i class="sw"></i>human</span>
+          <span class="cat">developer</span>
+          <span class="cat">newsletter</span>
+          <span class="cat">promotion</span>
+          <span class="cat">social</span>
+          <span class="cat">automated</span>
+        </div>
+        <p class="legendp"><i class="sw"></i>Protected by default. Starred mail is too, whatever its category.</p>
+        <div class="dims">
+          <div><b>Category</b><span>What it is</span></div>
+          <div><b>Attention</b><span>From "action required" to "no attention"</span></div>
+          <div><b>Retention</b><span>Keep, archive, review or clean up</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feat">
+      <div>
+        <span class="tag">03 / RULES</span>
+        <h3>Rules that suggest before they act.</h3>
+        <p>A rule is a filter plus an action. Build one from Rules → New rule, or save any plain-English search as one.</p>
+        <p>New rules only suggest. Open one and you get the usual preview. Mark it auto and it runs when you click Apply auto rules, or on a background schedule you set up.</p>
+        <p class="note">Rules can archive, mark read, label or star. They can't trash, and they skip protected mail.</p>
+      </div>
+      <div class="card rule">
+        <div class="line"><span>Rule</span><span>Old newsletters</span></div>
+        <div class="line"><span>When</span><span><span class="tok">category is newsletter</span> <span class="tok">older than 180 days</span></span></div>
+        <div class="line"><span>Then</span><span><span class="tok act">archive</span></span></div>
+        <div class="line"><span>Mode</span><span><span class="seg" role="group" aria-label="Rule mode"><button type="button" aria-pressed="true" data-m="suggest">Suggest</button><button type="button" aria-pressed="false" data-m="auto">Auto</button></span></span></div>
+        <p class="out" id="ruleOut"></p>
+        <div class="actrow" aria-label="Rule actions"><span>archive</span><span>mark read</span><span>label</span><span>star</span><s>trash</s></div>
+      </div>
+    </div>
+
+    <div class="feat flip">
+      <div>
+        <span class="tag">04 / UNSUBSCRIBE</span>
+        <h3>Unsubscribe from the loud ones.</h3>
+        <p>The Unsubscribe page lists senders that offer it, loudest first. Where a sender supports one-click unsubscribe, a single request goes from your machine and that's it. Otherwise their page, or a pre-filled email, opens for you to finish.</p>
+        <p><b>Unsubscribe &amp; archive</b> also clears their backlog, as an ordinary batch you can undo.</p>
+        <p class="note">Don't unsubscribe from spam. It tells the sender your address is real.</p>
+      </div>
+      <div class="card">
+        <h5>Because the link comes from the sender</h5>
+        <ol class="flow">
+          <li><span><b>https only.</b> Anything else is refused.</span></li>
+          <li><span><b>Public address, pinned.</b> The host has to resolve to a public IP, and the connection sticks to that address.</span></li>
+          <li><span><b>No cookies, no redirects.</b> One POST, nothing followed.</span></li>
+          <li><span><b>Only the host is logged.</b> The full link usually has a token that identifies you.</span></li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="feat">
+      <div>
+        <span class="tag">05 / ASSISTANT</span>
+        <h3>An AI that can only make suggestions.</h3>
+        <p>Off by default. Turn it on and it looks at senders the classifier isn't sure about, or ones that are loud and unprotected, and suggests a rule for each: protect, ignore, or a better category.</p>
+        <p>Nothing applies until you accept it. It can add protection but never remove it, and it's told nothing about senders it wasn't asked about. These limits are checked in code, not just asked for in the prompt.</p>
+        <p class="note">With the Assistant on, the Ask box also takes plain English, like "unread newsletters older than a year". It becomes a filter from a fixed field list, checked by the server. Never SQL.</p>
+      </div>
+      <div class="card">
+        <div class="provsw">
+          <div><b>On this computer</b><span>Ollama, with a model you've pulled. Nothing leaves your machine.</span></div>
+          <div><b>Claude</b><span>Your API key, saved only after you tick a consent box that says what's sent.</span></div>
+        </div>
+        <h5>What's shared per sender</h5>
+        <div class="sent">
+          <div class="yes">Address, message count, weekly rate, read rate</div>
+          <div class="yes">Whether it's a mailing list, and its current category</div>
+          <div class="yes">Up to five recent subject lines, unless you turn that off</div>
+          <div class="no">Message bodies. Never.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="smalls">
+      <div class="small"><span class="n">06</span><h4>Cleanup, ready-made</h4><p>Ignored newsletters, old promotions, social notifications, ancient unread, automated mail, anything over 2 MB. Largest first, protected mail excluded.</p></div>
+      <div class="small"><span class="n">07</span><h4>Needs attention</h4><p>Unread mail that looks like it matters: invoices, security notices, deadlines, and real people.</p></div>
+      <div class="small"><span class="n">08</span><h4>Getting louder</h4><p>Trend alerts flag senders whose volume jumped in the last 30 days, before they bury everything else.</p></div>
+      <div class="small"><span class="n">09</span><h4>Background sync and a digest</h4><p>Sync every few hours with launchd, systemd or Task Scheduler. You get a desktop notification when something needs you.</p></div>
+      <div class="small"><span class="n">10</span><h4>Ask Claude about your inbox</h4><p>A read-only MCP server lets Claude, or any MCP client, answer "who is filling my inbox?". No tool in it can change your mail.</p></div>
+      <div class="small"><span class="n">11</span><h4>Export it</h4><p>Senders or messages as CSV or JSON from Settings. The reporting commands take <code>--json</code> too.</p></div>
+      <div class="small"><span class="n">12</span><h4>Connection check</h4><p>Tests DNS, the port, TLS, the login, MOVE support and folder listing one by one, and tells you which setup step to redo.</p></div>
+      <div class="small"><span class="n">13</span><h4>Incremental sync</h4><p>The first sync covers the last year, or more if you want. After that it only picks up what changed.</p></div>
+      <div class="small"><span class="n">14</span><h4>A terminal dashboard too</h4><p>Prefer the keyboard? <code>mclean ui</code> has the same screens in your terminal. You never need it, but it's there.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="install" id="install">
+  <div class="wrap inst-grid">
+    <div>
+      <p class="eyebrow">Install</p>
+      <h2>One line<br>to install.</h2>
+      <p class="intro">No account to make. The installer fetches a standalone build for your machine from the latest GitHub release and checks its SHA-256. There's no Python to install.</p>
+
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" aria-selected="true" data-os="unix">macOS / Linux</button>
+        <button type="button" role="tab" aria-selected="false" data-os="win">Windows</button>
+      </div>
+      <div class="cmd"><span class="p">$ </span><code id="cmd">curl -fsSL https://raw.githubusercontent.com/RishikeshSreekumar/gmail_cleaner/main/install.sh | sh</code><button class="copy" type="button" id="copy">Copy</button></div>
+
+      <ol class="isteps">
+        <li><b>Run <code>mclean</code>.</b><span>Your browser opens on a page served from your computer. Keep the terminal open while you use it.</span></li>
+        <li><b>Add a mailbox.</b><span>For Gmail: turn on 2-Step Verification, create an app password, and enable IMAP in Gmail's settings. The page links to each one.</span></li>
+        <li><b>Look first, then clean.</b><span>It stays read-only until you turn actions on.</span></li>
+      </ol>
+      <p class="other">Also installs with pipx or uv, or from source. See <a href="https://github.com/RishikeshSreekumar/gmail_cleaner#install">the README</a>.</p>
+    </div>
+
+    <div class="stamp">
+      <div class="stamp-in">
+        <svg class="postmark" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="56" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="60" cy="60" r="44" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 52h104M8 60h104M8 68h104" stroke="currentColor" stroke-width="2.5"/></svg>
+        <div class="row1"><img src="mark.svg" alt=""><div><div class="stamp-name">mailcleaner</div><p class="sub">Open source · MIT</p></div></div>
+        <ul>
+          <li>Every provider, every mailbox</li>
+          <li>Cleanup, rules, unsubscribe and the Assistant</li>
+          <li>macOS, Linux and Windows</li>
+          <li>No telemetry, no account</li>
+        </ul>
+        <a class="btn btn-accent" href="https://github.com/RishikeshSreekumar/gmail_cleaner/releases/latest">Download from GitHub</a>
+        <p class="coffee"><b>Support the project.</b> If mailcleaner cleared a few thousand newsletters for you, a coffee helps keep it going.</p>
+        <div class="bmc-slot">
+          <script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="srishi" data-color="#BD5FFF" data-emoji="" data-font="Cookie" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#ffffff" data-coffee-color="#FFDD00"></script>
+          <a class="btn btn-line bmc-fallback" href="https://buymeacoffee.com/srishi" style="width:100%">Buy me a coffee</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="faq-sec" id="faq">
+  <div class="wrap">
+    <p class="eyebrow">FAQ</p>
+    <h2>Questions people ask</h2>
+    <div class="faq">
+      <details>
+        <summary>Is the source code available?</summary>
+        <p>Yes. It's on <a href="https://github.com/RishikeshSreekumar/gmail_cleaner">GitHub</a> under the MIT license, so you can read exactly what it does with your mailbox, or build it yourself. If you'd like to support the project, there's a <a href="https://buymeacoffee.com/srishi">Buy Me a Coffee page</a>.</p>
+      </details>
+      <details>
+        <summary>Can it delete my email?</summary>
+        <p>No. There's no permanent delete in the code for any provider. Trash moves mail to your provider's own Trash folder, where it stays recoverable, and you can undo the batch from History. If your server can't move messages, mailcleaner refuses to archive or trash instead of copying and deleting.</p>
+      </details>
+      <details>
+        <summary>Does my mail leave my computer?</summary>
+        <p>Headers come from your mail server into a local SQLite file, and stay there. There's no telemetry. The exceptions are ones you start: a one-click unsubscribe sends one request to the sender, and if you set up the Assistant with Claude, sender statistics and up to five subject lines per sender go to Anthropic. With Ollama, nothing leaves your machine.</p>
+      </details>
+      <details>
+        <summary>Why an app password instead of "Sign in with Google"?</summary>
+        <p>It keeps Google Cloud out of it entirely: no OAuth client, no consent screen, no app review. The app password lives in your system keychain and is only sent to Gmail's IMAP server. Revoke it on your Google account page and mailcleaner loses all access.</p>
+      </details>
+      <details>
+        <summary>What about Outlook and Microsoft 365?</summary>
+        <p>Microsoft turned off password sign-in for IMAP, so mailcleaner shows a short code to enter at microsoft.com/devicelogin. The only permission it asks for is IMAP access to your own mailbox, and you can revoke it from your Microsoft account. If your organisation blocks third-party apps, you can register your own and point mailcleaner at it.</p>
+      </details>
+      <details>
+        <summary>Does it work with Proton Mail?</summary>
+        <p>Yes, through Proton Mail Bridge, which needs a paid Proton plan. Bridge decrypts mail locally and gives you an IMAP host, port and password to use.</p>
+      </details>
+      <details>
+        <summary>Can I use it from the terminal instead?</summary>
+        <p>Yes. Everything in the browser app also works as commands, for scripts or if you prefer it, and <code>mclean ui</code> opens a terminal dashboard. The terminal is never required. The old <code>gclean</code> command still works as an alias.</p>
+      </details>
+      <details>
+        <summary>How do I uninstall it?</summary>
+        <p>On macOS and Linux, delete <code>~/.local/bin/mclean</code>, then <code>~/.mailcleaner</code> for the local indexes. On Windows the program lives in <code>%LOCALAPPDATA%\Programs\mailcleaner</code>. Removing the index doesn't touch your mail.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>mailcleaner. Open source, made by Rishikesh Sreekumar.</span>
+    <span><a href="https://github.com/RishikeshSreekumar/gmail_cleaner">GitHub</a> &nbsp;·&nbsp; <a href="https://github.com/RishikeshSreekumar/gmail_cleaner/blob/main/CHANGELOG.md">Changelog</a> &nbsp;·&nbsp; <a href="https://buymeacoffee.com/srishi">Buy me a coffee</a></span>
+  </div>
+</footer>
+
+<script>
+  // The widget script above renders the official button in the stamp card.
+  // Reuse it for the hero button. If it was blocked, show plain links instead.
+  if (window.bmcBtnWidget) {
+    const slot = document.getElementById("bmcHero");
+    const tpl = document.createElement("span");
+    tpl.innerHTML = bmcBtnWidget("Buy me a coffee", "srishi", "#BD5FFF", "", "Cookie", "#ffffff", "#000000", "#FFDD00");
+    slot.replaceWith(...tpl.childNodes);
+  } else {
+    document.querySelectorAll(".bmc-fallback").forEach(a => a.classList.add("show"));
+  }
+
+  // Install tabs + copy
+  (function () {
+    const cmds = {
+      unix: "curl -fsSL https://raw.githubusercontent.com/RishikeshSreekumar/gmail_cleaner/main/install.sh | sh",
+      win: "irm https://raw.githubusercontent.com/RishikeshSreekumar/gmail_cleaner/main/install.ps1 | iex",
+    };
+    const code = document.getElementById("cmd"), prompt = code.previousElementSibling;
+    document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+      document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+      code.textContent = cmds[b.dataset.os];
+      prompt.textContent = b.dataset.os === "win" ? "PS> " : "$ ";
+    }));
+    const copy = document.getElementById("copy");
+    copy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(code.textContent); copy.textContent = "Copied"; }
+      catch { copy.textContent = "Select it"; }
+      setTimeout(() => (copy.textContent = "Copy"), 1600);
+    });
+  })();
+
+  // Rule mode toggle
+  (function () {
+    const out = document.getElementById("ruleOut");
+    const text = {
+      suggest: "Suggest: shows 2,184 matching messages, 0 protected. Nothing happens until you act on the preview.",
+      auto: "Auto: also runs when you click Apply auto rules, or on your background schedule. Each run is its own batch you can undo.",
+    };
+    const btns = document.querySelectorAll(".seg button");
+    const set = m => { btns.forEach(b => b.setAttribute("aria-pressed", b.dataset.m === m)); out.textContent = text[m]; };
+    btns.forEach(b => b.addEventListener("click", () => set(b.dataset.m)));
+    set("suggest");
+  })();
+
+  // ---------- the demo app ----------
+  (function () {
+    const $ = s => document.querySelector(s);
+    const el = (tag, props = {}, kids = []) => {
+      const n = Object.assign(document.createElement(tag), props);
+      for (const k of [].concat(kids)) if (k != null) n.append(k);
+      return n;
+    };
+    const num = n => Math.round(n).toLocaleString("en-US");
+    const size = mb => mb >= 1024 ? (mb / 1024).toFixed(1) + " GB" : Math.round(mb) + " MB";
+    const plural = (n, w) => num(n) + " " + w + (n === 1 ? "" : "s");
+
+    // A made-up mailbox. Categories are what the classifier would say.
+    const fresh = () => ({
+      actions: false,
+      tab: "overview",
+      filter: "All",
+      selected: new Set(),
+      others: { emails: 14109, unread: 6170, mb: 2310 },
+      safe: { emails: 6912, mb: 1126, senders: 318 },
+      history: [],
+      senders: [
+        { key: "digest@quora.com", dom: "quora.com", emails: 1842, unread: 1790, wk: 9.1, trend: "flat", prot: 0, mb: 96, cat: "newsletter", span: "2 d – 4 y",
+          subj: ["Why do cats knead blankets?", "Your Quora Digest", "Top stories for you this week"] },
+        { key: "notifications@github.com", dom: "github.com", emails: 1311, unread: 402, wk: 12.4, trend: "up", prot: 0, mb: 41, cat: "developer", span: "3 h – 3 y",
+          subj: ["[acme/web] Fix flaky login test (#1297)", "[acme/api] CI failed on main", "Re: [acme/web] Bump vite to 6.2"] },
+        { key: "deals@shopnest.in", dom: "shopnest.in", emails: 1206, unread: 1188, wk: 7.8, trend: "up", prot: 0, mb: 210, cat: "promotion", span: "1 d – 2 y",
+          subj: ["Flat 60% off ends tonight", "Your cart misses you", "Festive sale: early access"] },
+        { key: "messages-noreply@linkedin.com", dom: "linkedin.com", emails: 987, unread: 951, wk: 6.2, trend: "down", prot: 0, mb: 88, cat: "social", span: "4 d – 5 y",
+          subj: ["You appeared in 9 searches this week", "Add Sam to your network", "3 new jobs for you"] },
+        { key: "weekly@thebrief.news", dom: "thebrief.news", emails: 640, unread: 598, wk: 4.1, trend: "down", prot: 0, mb: 54, cat: "newsletter", span: "6 d – 3 y",
+          subj: ["12 stories you missed this week", "The Brief: Tuesday edition", "Last chance to renew at 40% off"] },
+        { key: "alerts@status.acmecloud.io", dom: "acmecloud.io", emails: 533, unread: 520, wk: 3.4, trend: "flat", prot: 0, mb: 12, cat: "automated", span: "1 d – 2 y",
+          subj: ["[Resolved] Elevated latency in ap-south-1", "Monthly usage report", "Scheduled maintenance"] },
+        { key: "statements@northbank.com", dom: "northbank.com", emails: 412, unread: 30, wk: 1.8, trend: "flat", prot: 412, mb: 140, cat: "finance", span: "5 d – 6 y",
+          subj: ["Your September statement is ready", "Payment received, thank you", "Credit limit update"] },
+        { key: "orders@cartly.com", dom: "cartly.com", emails: 188, unread: 20, wk: 1.1, trend: "flat", prot: 188, mb: 23, cat: "orders", span: "9 d – 4 y",
+          subj: ["Your order has shipped", "Delivered: 2 items", "Return request received"] },
+        { key: "priya@gmail.com", dom: "gmail.com", emails: 211, unread: 3, wk: 1.2, trend: "flat", prot: 211, mb: 64, cat: "human", span: "2 d – 7 y",
+          subj: ["Re: Saturday?", "Photos from the trip", "Re: that recipe"] },
+        { key: "hello@fitloop.app", dom: "fitloop.app", emails: 77, unread: 77, wk: 3.6, trend: "new", prot: 0, mb: 9, cat: "promotion", span: "1 d – 5 w",
+          subj: ["Your free trial ends in 3 days", "Meet your new streak", "We made a playlist for you"] },
+      ],
+      batches: [
+        { key: "Large mail", desc: "Anything over 2 MB that is not protected", emails: 38, mb: 412 },
+        { key: "Old promotions", desc: "Marketing mail older than 90 days", emails: 1906, mb: 298 },
+        { key: "Still in inbox, no attention needed", desc: "Inbox clutter the classifier rates as needing nothing", emails: 3011, mb: 187 },
+        { key: "Ancient unread", desc: "Unread, unstarred, unprotected, older than 2 years", emails: 1402, mb: 133 },
+        { key: "Ignored newsletters", desc: "Newsletter, unread, older than 6 months, never starred", emails: 2184, mb: 112 },
+        { key: "Social notifications", desc: "Social network noise older than 90 days", emails: 874, mb: 61 },
+        { key: "Automated system mail", desc: "Machine-generated mail older than 60 days", emails: 1120, mb: 44 },
+      ],
+    });
+    let S = fresh();
+    const CAT_COLORS = { newsletter: "#e9c9a6", developer: "#cfdcc0", promotion: "#e6b49a", social: "#d8d2bf", automated: "#d9dfe0", finance: "#a9cfb4", orders: "#a9cfb4", human: "#a9cfb4" };
+    const DOMAIN_COLORS = ["#e2b39a", "#ebccad", "#ede0bd", "#d4dfbf", "#cfe1d2", "#d2e3e6"];
+    const PROTECTED = new Set(["finance", "orders", "human", "security", "travel"]);
+
+    const totals = () => S.senders.reduce((a, s) => ({ emails: a.emails + s.emails, unread: a.unread + s.unread, mb: a.mb + s.mb }),
+      { ...S.others });
+    const senderCount = () => 1284;
+
+    const NAV = [
+      ["Mailbox", [["overview", "Overview"], ["attention", "Attention"], ["senders", "Senders"], ["cleanup", "Cleanup"]]],
+      ["Explore", [["domains", "Domains"], ["categories", "Categories"], ["ages", "Age"]]],
+      ["Automate", [["rules", "Rules"], ["unsubscribe", "Unsubscribe"], ["assistant", "Assistant"]]],
+      ["", [["history", "History"], ["settings", "Settings"]]],
+    ];
+    const STUBS = {
+      attention: ["Needs attention", "Unread mail the classifier thinks you actually care about.", "#features"],
+      domains: ["Domains", "Mail rolled up by sending domain. Click one to preview acting on all of it.", "#features"],
+      categories: ["Categories", "What the classifier made of your mail.", "#features"],
+      ages: ["Age", "How old your mail is. Click a band to preview acting on all of it.", "#features"],
+      rules: ["Rules", "A rule is a filter plus an action. Rules suggest: open one to preview and act. Protected mail is always excluded and trash is never automatic.", "#features"],
+      unsubscribe: ["Unsubscribe", "Senders whose mail offers an unsubscribe. One-click ones are handled from here; for the rest the sender’s page opens for you.", "#features"],
+      assistant: ["Assistant", "Optional. Proposes rules for senders the classifier is unsure about.", "#features"],
+      settings: ["Settings", "For you@gmail.com, unless a section says otherwise.", "#install"],
+    };
+
+    const app = $("#app"), main = $("#amain"), body = $("#abody");
+    const modeBtn = $("#mode");
+
+    function drawNav() {
+      const nav = $("#nav"), tabs = $("#tabs");
+      nav.textContent = ""; tabs.textContent = "";
+      for (const [label, items] of NAV) {
+        const g = el("div", { className: "grp" });
+        if (label) g.append(el("div", { className: "gl", textContent: label }));
+        for (const [k, t] of items) {
+          const count = k === "history" && S.history.length ? el("span", { className: "count", textContent: S.history.length }) : null;
+          g.append(el("button", { type: "button", className: S.tab === k ? "on" : "", onclick: () => go(k) }, [el("span", { textContent: t }), count]));
+          tabs.append(el("button", { type: "button", className: S.tab === k ? "on" : "", textContent: t, onclick: () => go(k) }));
+        }
+        nav.append(g);
+      }
+      nav.append(el("div", { className: "note" }, [el("span", {}, [el("i", { className: "sw" }), "Protected"]),
+        "Finance, security, travel, orders, people you write to and starred mail are never in a bulk action."]));
+    }
+
+    function drawMode() {
+      modeBtn.classList.toggle("on", S.actions);
+      modeBtn.setAttribute("aria-pressed", S.actions);
+      modeBtn.querySelector("span").textContent = S.actions ? "Actions on" : "Read-only";
+    }
+    modeBtn.addEventListener("click", () => { S.actions = !S.actions; if (!S.actions) S.selected.clear(); drawMode(); go(S.tab, true); });
+
+    function pageHead(title, lede, actions) {
+      return el("div", { className: "ph" }, [el("div", {}, [el("h3", { textContent: title }), lede ? el("p", { textContent: lede }) : null]),
+        actions ? el("div", { className: "abtns" }, actions) : null]);
+    }
+    const button = (label, run, cls = "") => el("button", { type: "button", className: "abtn " + cls, textContent: label, onclick: run });
+
+    function senderTable(rows) {
+      const max = Math.max(1, ...S.senders.map(r => r.emails));
+      const t = el("div", { className: "tbl st" + (S.actions ? " cbx" : "") });
+      const head = el("div", { className: "tr th" }, [
+        S.actions ? el("span") : null,
+        el("span", { textContent: "Sender" }), el("span", { className: "r", textContent: "Emails" }), el("span", { className: "r c-un", textContent: "Unread" }),
+        el("span", { className: "r c-wk", textContent: "/ week" }), el("span", { className: "c-tr", textContent: "Trend" }), el("span", { className: "r", textContent: "Protected" }),
+      ]);
+      t.append(head);
+      const TR = { up: ["↑ rising", "t-up"], new: ["↑ new", "t-up"], down: ["↓ falling", "t-down"], flat: ["→ flat", "t-flat"] };
+      for (const r of rows) {
+        const cb = S.actions ? el("input", { type: "checkbox", className: "cb", checked: S.selected.has(r.key), ariaLabel: "Select " + r.key,
+          onclick: e => { e.stopPropagation(); e.target.checked ? S.selected.add(r.key) : S.selected.delete(r.key); drawSelBar(); } }) : null;
+        const row = el("div", { className: "tr row", tabIndex: 0, onclick: () => openPreview({ kind: "sender", keys: [r.key] }, "trash"),
+          onkeydown: e => { if (e.key === "Enter") openPreview({ kind: "sender", keys: [r.key] }, "trash"); } }, [
+          cb,
+          el("div", { className: "snd" }, [el("span", { className: "a", textContent: r.key }), el("div", { className: "bar", style: `width:${Math.max(2, r.emails / max * 100)}%` })]),
+          el("span", { className: "r num", textContent: num(r.emails) }),
+          el("span", { className: "r num c-un", textContent: num(r.unread) }),
+          el("span", { className: "r num c-wk", textContent: r.wk.toFixed(1) }),
+          el("span", { className: "trend c-tr " + TR[r.trend][1], textContent: TR[r.trend][0] }),
+          el("span", { className: "r num " + (r.prot ? "prot1" : "prot0"), textContent: r.prot ? num(r.prot) : "—" }),
+        ]);
+        t.append(row);
+      }
+      return t;
+    }
+
+    const VIEWS = {};
+    VIEWS.overview = m => {
+      const tt = totals();
+      m.append(el("div", { className: "ov" }, [
+        el("div", {}, [el("div", { className: "k", textContent: "Mailbox" }), el("div", { className: "fig num", textContent: size(tt.mb) }),
+          el("div", { className: "u num", textContent: `${num(tt.emails)} messages · ${num(senderCount())} senders · ${num(tt.unread)} unread` })]),
+        el("div", { className: "vr" }),
+        el("div", {}, [el("div", { className: "k", textContent: "Safe to clean" }), el("div", { className: "fig num", style: "color:var(--accent)", textContent: size(S.safe.mb) }),
+          el("div", { className: "u", textContent: `${num(S.safe.emails)} messages from ${num(S.safe.senders)} senders. Protected mail excluded.` })]),
+        button("Review cleanup", () => go("cleanup"), "primary big"),
+      ]));
+      // where the volume comes from
+      const top = S.senders.filter(r => r.emails > 0).sort((a, b) => b.emails - a.emails).slice(0, 5);
+      const shown = top.reduce((a, x) => a + x.emails, 0);
+      const parts = top.map((x, i) => ({ name: x.dom, emails: x.emails, color: DOMAIN_COLORS[i] }));
+      parts.push({ name: "1,147 others", emails: tt.emails - shown, color: "#ece6dc" });
+      const sec = el("div", { className: "a-sec" }, [el("h4", { textContent: "Where the volume comes from" }),
+        el("p", { className: "sub", textContent: `5 domains account for ${Math.round(shown / tt.emails * 100)}% of your mailbox.` })]);
+      sec.append(el("div", { className: "stack" }, parts.map(p => {
+        const pct = p.emails / tt.emails;
+        return el("div", { title: `${p.name}: ${num(p.emails)}`, style: `width:${(pct * 100).toFixed(2)}%;background:${p.color}`, textContent: pct > .07 ? p.name.replace(/\.(com|in|io|news|app)$/, "") : "" });
+      })));
+      sec.append(el("div", { className: "legend" }, parts.map(p => el("span", {}, [el("i", { style: `background:${p.color}` }), p.name, el("b", { className: "num", textContent: num(p.emails) })]))));
+      m.append(sec);
+      const s2 = el("div", { className: "a-sec" }, [el("div", { className: "ph", style: "margin-bottom:10px" }, [
+        el("div", {}, [el("h4", { textContent: "The loudest senders" }), el("p", { className: "sub", style: "margin:0", textContent: "Click a row to see what it actually sends you." })]),
+        button(`All ${num(senderCount())} senders →`, () => go("senders"), "link")])]);
+      s2.append(senderTable(S.senders.filter(r => r.emails > 0).sort((a, b) => b.emails - a.emails).slice(0, 6)));
+      m.append(s2);
+    };
+
+    const FILTERS = {
+      All: () => true,
+      Noisy: r => r.wk >= 5,
+      "Never opened": r => r.emails > 0 && r.unread / r.emails > .9,
+      "Mostly protected": r => r.emails > 0 && r.prot / r.emails > .5,
+    };
+    VIEWS.senders = m => {
+      m.append(pageHead("Senders", `${num(senderCount())} senders, loudest first.`, [button("Export CSV", () => toast("In the app this downloads senders.csv."))]));
+      const visible = S.senders.filter(r => r.emails > 0 && FILTERS[S.filter](r)).sort((a, b) => b.emails - a.emails);
+      m.append(el("div", { className: "toolbar" }, [
+        ...Object.keys(FILTERS).map(n => el("button", { type: "button", className: "chip" + (S.filter === n ? " on" : ""), textContent: n, onclick: () => { S.filter = n; go("senders", true); } })),
+        el("span", { className: "cnt num", textContent: `${visible.length} shown` }),
+      ]));
+      m.append(senderTable(visible));
+      if (!S.actions) m.append(el("div", { className: "notice" }, [el("span", { textContent: "Read-only. Turn on actions to select senders and clean them up." }),
+        button("Turn on actions", () => modeBtn.click())]));
+    };
+
+    VIEWS.cleanup = m => {
+      m.append(pageHead("Cleanup", "Ready-made batches, largest first. Every batch excludes protected mail and can be undone."));
+      S.batches.forEach((b, i) => m.append(el("div", { className: "batch" + (b.done ? " done" : "") }, [
+        el("div", {}, [el("div", { className: "t", textContent: b.key }), el("div", { className: "d", textContent: b.desc })]),
+        el("div", {}, [el("div", { className: "big num", textContent: num(b.done ? 0 : b.emails) }), el("div", { className: "cap", textContent: "messages" })]),
+        el("div", { className: "hide-s" }, [el("div", { className: "big num", style: "color:var(--accent)", textContent: size(b.done ? 0 : b.mb) }), el("div", { className: "cap", textContent: "freed" })]),
+        el("div", { className: "abtns", style: "justify-content:flex-end" }, b.done ? el("span", { className: "cap", textContent: "Cleaned" })
+          : button(S.actions ? "Clean up" : "Preview", () => openPreview({ kind: "batch", index: i }, "trash"), S.actions ? "primary" : "")),
+      ])));
+      m.append(el("div", { className: "safe" }, [el("i", { className: "sw" }), el("span", {}, [el("strong", { textContent: "2,047 messages stay put. " }),
+        "Finance, security, travel, orders, people you write to and anything starred is never included."])]));
+    };
+
+    VIEWS.history = m => {
+      m.append(pageHead("History", "Every batch this app has run. Undo puts it back."));
+      if (!S.history.length) { m.append(el("div", { className: "stub", textContent: "Nothing yet. Turn on actions, clean something up, and it shows here." })); return; }
+      const t = el("div", { className: "tbl" });
+      t.style.setProperty("--cols", "minmax(0,1fr) 84px 72px 70px");
+      t.append(el("div", { className: "tr th" }, [el("span", { textContent: "Detail" }), el("span", { textContent: "Action" }), el("span", { className: "r", textContent: "Messages" }), el("span")]));
+      for (const h of S.history.slice().reverse()) t.append(el("div", { className: "tr" }, [
+        el("span", { className: "mono", style: "font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap", textContent: h.detail }),
+        el("span", { textContent: h.action.replace("_", " ") }),
+        el("span", { className: "r num", textContent: num(h.n) }),
+        el("span", { className: "r" }, h.undone ? el("span", { className: "cap", style: "color:var(--dim);font-size:12px", textContent: "undone" }) : button("Undo", () => undo(h))),
+      ]));
+      m.append(t);
+    };
+
+    for (const k in STUBS) VIEWS[k] = m => {
+      const [t, lede, anchor] = STUBS[k];
+      m.append(pageHead(t, lede));
+      m.append(el("div", { className: "stub" }, ["Not in this demo. ", el("a", { href: anchor, textContent: "Read about it below ↓" })]));
+    };
+
+    function go(tab, keepScroll) {
+      S.tab = tab;
+      const top = main.scrollTop;
+      main.textContent = "";
+      VIEWS[tab](main);
+      main.scrollTop = keepScroll ? top : 0;
+      drawNav();
+      drawSelBar();
+    }
+
+    // ---- selection bar ----
+    let selbar = null;
+    function drawSelBar() {
+      if (selbar) { selbar.remove(); selbar = null; }
+      if (!S.actions || !S.selected.size || S.tab === "cleanup" || S.tab === "history") return;
+      const chosen = S.senders.filter(s => S.selected.has(s.key));
+      const affected = chosen.reduce((a, s) => a + s.emails - s.prot, 0);
+      const prot = chosen.reduce((a, s) => a + s.prot, 0);
+      const keys = [...S.selected];
+      selbar = el("div", { className: "selbar" }, [
+        el("span", { textContent: `${plural(chosen.length, "sender")} · ${num(affected)} would be affected` + (prot ? ` · ${num(prot)} protected` : "") }),
+        el("div", { className: "abtns" }, [
+          button("Mark read", () => openPreview({ kind: "sender", keys }, "mark_read")),
+          button("Archive", () => openPreview({ kind: "sender", keys }, "archive")),
+          button("Trash", () => openPreview({ kind: "sender", keys }, "trash"), "primary"),
+        ]),
+      ]);
+      body.append(selbar);
+    }
+
+    // ---- preview sheet ----
+    let scrim = null;
+    function closeSheet() { if (scrim) { scrim.remove(); scrim = null; } }
+    function info(target) {
+      if (target.kind === "batch") {
+        const b = S.batches[target.index];
+        return { title: b.key, eligible: b.emails, prot: 0, mb: b.mb, span: "3 mo – 6 y",
+          cats: [["promotion", .4], ["newsletter", .3], ["social", .15], ["automated", .15]],
+          samples: [["deals@shopnest.in", "Flat 60% off ends tonight", "7 mo"], ["digest@quora.com", "Your Quora Digest", "1 y"], ["messages-noreply@linkedin.com", "3 new jobs for you", "2 y"], ["alerts@status.acmecloud.io", "Monthly usage report", "4 mo"]] };
+      }
+      const ss = S.senders.filter(s => target.keys.includes(s.key));
+      const emails = ss.reduce((a, s) => a + s.emails, 0) || 1;
+      const prot = ss.reduce((a, s) => a + s.prot, 0);
+      const byCat = {};
+      ss.forEach(s => (byCat[s.cat] = (byCat[s.cat] || 0) + s.emails));
+      return {
+        title: ss.length === 1 ? ss[0].key : plural(ss.length, "sender"),
+        eligible: ss.reduce((a, s) => a + s.emails - s.prot, 0), prot,
+        mb: ss.reduce((a, s) => a + s.mb, 0), span: ss.length === 1 ? ss[0].span : "1 d – 7 y",
+        cats: Object.entries(byCat).map(([c, n]) => [c, n / emails]),
+        samples: ss.flatMap(s => s.subj.slice(0, ss.length > 1 ? 2 : 3).map((t, i) => [s.key, t, ["2 d", "3 w", "5 mo"][i]])).slice(0, 6),
+      };
+    }
+    function openPreview(target, preferred) {
+      closeSheet();
+      const d = info(target);
+      const stat = (v, k, style) => el("div", {}, [el("b", { className: "num", style: style || "", textContent: v }), el("span", { textContent: k })]);
+      const sheet = el("div", { className: "sheet", role: "dialog", ariaLabel: "Selection preview" });
+      sheet.append(el("div", { className: "sh-top" }, [
+        el("div", { className: "k", textContent: "Selection" }), el("div", { className: "ttl", textContent: d.title }),
+        el("div", { className: "stats" }, [stat(num(d.eligible), "would be affected"), stat(size(d.mb), "total size"),
+          stat(num(d.prot), "protected · excluded", "color:var(--green)"), stat(d.span, "age range")]),
+      ]));
+      const b = el("div", { className: "sh-body" });
+      b.append(el("h5", { textContent: "What is in the selection" }));
+      b.append(el("div", {}, [el("div", { className: "cats" }, d.cats.map(([c, f]) => el("div", { title: c, style: `width:${f * 100}%;background:${CAT_COLORS[c] || "#ddd"}` }))),
+        el("div", { className: "legend" }, d.cats.map(([c, f]) => el("span", {}, [el("i", { style: `background:${CAT_COLORS[c] || "#ddd"}` }), c,
+          PROTECTED.has(c) ? el("b", { style: "color:var(--green)", textContent: "protected" }) : el("b", { textContent: Math.round(f * 100) + "%" })])))]));
+      b.append(el("h5", { textContent: "Examples" }));
+      b.append(el("div", { className: "subj" }, d.samples.map(([f, s, w]) => el("div", {}, [el("span", { textContent: `${f} — ${s}` }), el("span", { textContent: w })]))));
+      sheet.append(b);
+      const foot = el("div", { className: "sh-foot" });
+      if (!S.actions) {
+        foot.append(el("span", { className: "msg", textContent: "Read-only. Nothing will be changed." }),
+          button("Close", closeSheet), button("Turn on actions", () => { modeBtn.click(); openPreview(target, preferred); }, "primary"));
+      } else if (!d.eligible) {
+        foot.append(el("span", { className: "msg", textContent: "Nothing eligible — everything here is protected." }), button("Close", closeSheet));
+      } else {
+        foot.append(el("span", { className: "msg", textContent: "Reversible from History." }));
+        foot.append(button("Cancel", closeSheet));
+        const acts = target.kind === "batch" ? [["trash", "Trash"]] : [["mark_read", "Mark read"], ["archive", "Archive"], ["trash", "Trash"]];
+        for (const [id, label] of acts) foot.append(button(id === preferred ? `${label} ${num(d.eligible)}` : label, () => run(target, id, d), id === preferred ? "primary" : ""));
+      }
+      sheet.append(foot);
+      scrim = el("div", { className: "scrim", onclick: e => { if (e.target === scrim) closeSheet(); } }, sheet);
+      body.append(scrim);
+      sheet.querySelector(".sh-foot .primary, .sh-foot button")?.focus({ preventScroll: true });
+    }
+    body.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+
+    // Each batch remembers exactly what it changed, so any one can be undone on its own.
+    function run(target, action, d) {
+      const changes = [], safe = { emails: 0, mb: 0, senders: 0 };
+      let batch = null;
+      if (target.kind === "batch") {
+        batch = S.batches[target.index];
+        batch.done = true;
+        changes.push({ s: S.others, de: batch.emails, du: Math.round(batch.emails * .6), dm: batch.mb });
+        safe.emails = batch.emails; safe.mb = batch.mb;
+      } else {
+        for (const s of S.senders.filter(s => target.keys.includes(s.key))) {
+          const elig = s.emails - s.prot;
+          if (!elig) continue;
+          const du = Math.min(s.unread, elig);
+          if (action === "trash") {
+            const dm = s.mb * elig / s.emails;
+            changes.push({ s, de: elig, du, dm });
+            safe.emails += elig; safe.mb += dm * .8; safe.senders += 1;
+          } else if (action === "mark_read") {
+            changes.push({ s, de: 0, du, dm: 0 });
+          }
+        }
+        S.selected.clear();
+      }
+      for (const k in safe) safe[k] = Math.min(safe[k], S.safe[k]);
+      const apply = sign => {
+        for (const c of changes) { c.s.emails -= sign * c.de; c.s.unread -= sign * c.du; c.s.mb -= sign * c.dm; }
+        for (const k in safe) S.safe[k] -= sign * safe[k];
+      };
+      apply(1);
+      const h = { action, detail: d.title, n: d.eligible, undone: false, revert: () => { apply(-1); if (batch) batch.done = false; } };
+      S.history.push(h);
+      closeSheet();
+      go(S.tab, true);
+      toast(`${action.replace("_", " ")}: ${num(d.eligible)} messages` + (d.prot ? `, ${num(d.prot)} protected skipped` : "") + ".", () => undo(h));
+    }
+    function undo(h) {
+      if (h.undone) return;
+      h.revert();
+      h.undone = true;
+      go(S.tab, true);
+      toast(`Undone: ${h.action.replace("_", " ")} of ${num(h.n)} messages.`);
+    }
+
+    let toastEl = null, toastTimer;
+    function toast(text, undoFn) {
+      if (toastEl) toastEl.remove();
+      toastEl = el("div", { className: "toast", role: "status" }, [el("span", { textContent: text }),
+        undoFn ? el("button", { type: "button", textContent: "Undo", onclick: () => { toastEl.remove(); undoFn(); } }) : null]);
+      body.append(toastEl);
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl && toastEl.remove(), undoFn ? 9000 : 5000);
+    }
+
+    drawMode();
+    go("overview");
+  })();
+</script>
+</body>
+</html>
